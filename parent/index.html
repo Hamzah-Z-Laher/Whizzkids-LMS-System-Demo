@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Whizzkidz Academy</title>
+<meta name="theme-color" content="#EEF0F8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Whizzkidz">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" type="image/png" href="../assets/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/brand.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/motion.css">
+</head>
+<body>
+
+<div class="shell">
+  <aside class="side mesh" id="side" aria-label="Sections"></aside>
+  <div class="main">
+    <header class="bar" id="bar"></header>
+    <main class="view" id="view"></main>
+  </div>
+</div>
+
+<nav class="tabbar" id="tabbar" aria-label="Main"></nav>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-label="Photo viewer">
+  <img id="lb-img" alt="">
+  <button class="lb-btn lb-close" onclick="closeLightbox()" aria-label="Close" data-icon="x"></button>
+  <button class="lb-btn lb-prev" id="lb-prev" onclick="stepLightbox(-1)" aria-label="Previous photo" data-icon="left"></button>
+  <button class="lb-btn lb-next" id="lb-next" onclick="stepLightbox(1)" aria-label="Next photo" data-icon="right"></button>
+  <div class="lb-count" id="lb-count"></div>
+</div>
+
+<script src="../js/common.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/parent.js"></script>
+</body>
+</html>

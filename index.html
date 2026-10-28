@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Whizzkidz Academy — Sign in</title>
+<meta name="description" content="The Whizzkidz Academy school app: notices, homework, timetables, attendance and fees in one place.">
+<meta name="theme-color" content="#120A45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Whizzkidz">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="assets/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/brand.css">
+<link rel="stylesheet" href="css/motion.css">
+<style>
+  body{ color: #fff; background: #120A45; }
+  body::before{
+    background:
+      radial-gradient(60% 50% at 0% 0%, rgba(11,120,194,.55), transparent 70%),
+      radial-gradient(50% 45% at 100% 100%, rgba(211,40,62,.38), transparent 70%),
+      linear-gradient(180deg, rgba(18,10,69,.62) 0%, rgba(18,10,69,.88) 55%, rgba(18,10,69,.96) 100%),
+      url('assets/photos/assembly.jpg') center 30% / cover no-repeat;
+  }
+  .signin{ min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(40px + var(--safe-top)) 18px calc(28px + var(--safe-bottom)); }
+  .brandmark{ display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 26px; }
+  .brandmark .emblem{ width: 76px; height: 76px; box-shadow: 0 0 0 4px rgba(255,255,255,.25), 0 18px 40px -12px rgba(0,0,0,.6); }
+
+  .glass-card{
+    width: 100%; max-width: 440px; padding: 26px 22px; border-radius: 28px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    -webkit-backdrop-filter: blur(26px) saturate(160%); backdrop-filter: blur(26px) saturate(160%);
+    box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 30px 60px -20px rgba(0,0,0,.55);
+  }
+  .glass-card h1{ color: #fff; font-size: 26px; }
+  .glass-card .lede{ color: rgba(255,255,255,.72); margin: 6px 0 22px; }
+  .glass-card .field > span{ color: rgba(255,255,255,.75); }
+  .glass-card .field input{ background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.22); color: #fff; }
+  .glass-card .field input:focus{ border-color: rgba(255,255,255,.6); box-shadow: 0 0 0 4px rgba(255,255,255,.12); }
+
+  .divider{ display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; color: rgba(255,255,255,.55); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .divider::before, .divider::after{ content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.18); }
+  .roles{ display: grid; gap: 10px; }
+  .role-btn{ display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; text-align: left; min-height: 66px; transition: transform .12s, background .15s; }
+  .role-btn:active{ transform: scale(.985); }
+  .role-btn .icon{ width: 22px; height: 22px; }
+  .role-btn strong{ display: block; font-size: 15.5px; }
+  .role-btn small{ display: block; font-size: 13px; opacity: .72; font-weight: 600; }
+  .role-btn .go{ margin-left: auto; }
+  .role-parent{ background: #fff; color: var(--navy); box-shadow: 0 14px 30px -12px rgba(0,0,0,.5); }
+  .role-staff{ color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); }
+  .role-staff:hover{ background: rgba(255,255,255,.14); }
+  .foot{ margin-top: 22px; text-align: center; font-size: 12.5px; color: rgba(255,255,255,.55); line-height: 1.7; }
+  .foot a{ color: rgba(255,255,255,.85); font-weight: 600; }
+</style>
+</head>
+<body class="signin-page">
+<main class="signin">
+  <div class="brandmark">
+    <img class="emblem" src="assets/brand/emblem.png" alt="Whizzkidz Academy crest">
+    <span class="wordmark light lg"><span class="wm-top">Whizzkidz</span><span class="wm-bottom">Academy</span></span>
+  </div>
+
+  <section class="glass-card">
+    <h1>Welcome back</h1>
+    <p class="lede">Sign in to see notices, homework, timetables, attendance and fees.</p>
+
+    <label class="field"><span>Email or cellphone</span><input type="email" value="naledi.khumalo@example.com" autocomplete="username"></label>
+    <label class="field"><span>Password</span><input type="password" value="whizzkidz" autocomplete="current-password"></label>
+
+    <div class="divider">Demo accounts</div>
+    <div class="roles">
+      <button class="role-btn role-parent" onclick="signIn('parent')">
+        <span data-icon="users"></span>
+        <span><strong>Continue as a parent</strong><small>Naledi Khumalo · Amahle &amp; Tiyani</small></span>
+        <span class="go" data-icon="right"></span>
+      </button>
+      <button class="role-btn role-staff" onclick="signIn('staff')">
+        <span data-icon="register"></span>
+        <span><strong>Continue as staff</strong><small>Sharon Govender · Administrator</small></span>
+        <span class="go" data-icon="right"></span>
+      </button>
+    </div>
+  </section>
+
+  <p class="foot">
+    <a href="tel:0768974682">076 897 4682</a> · <a href="mailto:info@whizzkid.co.za">info@whizzkid.co.za</a><br>
+    Prototype with sample data
+  </p>
+</main>
+
+<script src="js/common.js"></script>
+<script>
+  hydrateIcons();
+  stagger(document.querySelector('.glass-card'));
+  function signIn(role){
+    save('wk_role', role);
+    location.href = role === 'parent' ? 'parent/index.html' : 'staff/index.html';
+  }
+</script>
+</body>
+</html>
