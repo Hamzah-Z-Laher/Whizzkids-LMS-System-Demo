@@ -1,6 +1,15 @@
 /* Demo data for the Whizzkidz Academy prototype.
    All dates are relative to the day the demo is opened so it never looks stale. */
 
+/* Bump when sample data changes so stale demo state from an older version is cleared once. */
+const DATA_VERSION = '3-f1';
+try{
+  if(localStorage.getItem('wk_version') !== DATA_VERSION){
+    Object.keys(localStorage).filter(k => k.startsWith('wk_') && k !== 'wk_session').forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('wk_version', DATA_VERSION);
+  }
+}catch(e){}
+
 const TODAY = (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })();
 
 function isoOf(dt){
@@ -57,35 +66,35 @@ const SUBJECT_COLORS = {
 };
 
 const PARENT = {
-  title: 'Mrs', first: 'Naledi', last: 'Khumalo',
-  name: 'Naledi Khumalo',
-  email: 'naledi.khumalo@example.com',
+  title: 'Mr', first: 'Jos', last: 'Verstappen',
+  name: 'Jos Verstappen',
+  email: 'jos.verstappen@example.com',
   phone: '082 445 1290',
 };
 
 const FAMILY_ACCOUNT = {
   number: 'WKA-20419',
-  name: 'Khumalo family',
+  name: 'Verstappen family',
   dueDate: dayOffset(-4),
   bank: { name: 'Demo Bank', account: '0000 000 000', branch: '000000', reference: 'WKA-20419' },
 };
 
 const CHILDREN = [
-  { id: 'amahle', first: 'Amahle', name: 'Amahle Khumalo', grade: 'Grade 3', className: '3B', classId: 'c3', learnerId: 'l1',
-    phase: 'primary', teacher: 'Mrs Van Wyk', aqua: true },
-  { id: 'tiyani', first: 'Tiyani', name: 'Tiyani Khumalo', grade: 'Grade 6', className: '6A', classId: 'c4', learnerId: 'l2',
-    phase: 'primary', teacher: 'Mr Botha', aqua: false },
+  { id: 'max', first: 'Max', name: 'Max Verstappen', grade: 'Grade 6', className: '6A', classId: 'c4', learnerId: 'l2',
+    phase: 'primary', teacher: 'Mr Rosberg', aqua: false },
+  { id: 'kimi', first: 'Kimi', name: 'Kimi Verstappen', grade: 'Grade 3', className: '3B', classId: 'c3', learnerId: 'l1',
+    phase: 'primary', teacher: 'Mr Coulthard', aqua: true },
 ];
 
 /* Attendance: every school day this term is "present" unless listed here (offset in school days). */
 const ATTENDANCE_EXCEPTIONS = {
-  amahle: [
+  kimi: [
     { day: -3, status: 'late', note: 'Arrived 08:20' },
     { day: -6, status: 'absent', note: 'Sick note submitted' },
     { day: -14, status: 'late', note: 'Arrived 07:55' },
     { day: -19, status: 'absent', note: 'Doctor\'s appointment' },
   ],
-  tiyani: [
+  max: [
     { day: -9, status: 'absent', note: 'Dentist appointment' },
     { day: -22, status: 'late', note: 'Arrived 07:50' },
   ],
@@ -93,14 +102,14 @@ const ATTENDANCE_EXCEPTIONS = {
 const TERM_SCHOOL_DAYS = 30;
 
 const TIMETABLE = {
-  amahle: {
+  kimi: {
     Mon: [['07:30','08:15','Mathematics','B3'],['08:15','09:00','English','B3'],['09:00','09:45','Afrikaans','B3'],['09:45','10:05','Break',''],['10:05','10:50','Life Skills','B3'],['10:50','11:35','Creative Arts','Art studio'],['11:35','12:20','Natural Sciences','B3']],
     Tue: [['07:30','08:15','English','B3'],['08:15','09:00','Mathematics','B3'],['09:00','09:45','Natural Sciences','B3'],['09:45','10:05','Break',''],['10:05','10:50','Physical Education','Field'],['10:50','11:35','Music','Music room'],['11:35','12:20','Afrikaans','B3']],
     Wed: [['07:30','08:15','Mathematics','B3'],['08:15','09:00','English','B3'],['09:00','09:45','Afrikaans','B3'],['09:45','10:05','Break',''],['10:05','10:50','Social Sciences','B3'],['10:50','11:35','Swimming','Aqua School'],['11:35','12:20','Life Skills','B3']],
     Thu: [['07:30','08:15','English','B3'],['08:15','09:00','Mathematics','B3'],['09:00','09:45','Life Skills','B3'],['09:45','10:05','Break',''],['10:05','10:50','Creative Arts','Art studio'],['10:50','11:35','Natural Sciences','B3'],['11:35','12:20','Afrikaans','B3']],
     Fri: [['07:30','08:15','Mathematics','B3'],['08:15','09:00','English','B3'],['09:00','09:40','Assembly','Hall'],['09:40','10:00','Break',''],['10:00','10:45','Physical Education','Field'],['10:45','11:30','Music','Music room']],
   },
-  tiyani: {
+  max: {
     Mon: [['07:30','08:20','Mathematics','A5'],['08:20','09:10','English','A5'],['09:10','10:00','Technology','Computer lab'],['10:00','10:20','Break',''],['10:20','11:10','Natural Sciences','A5'],['11:10','12:00','Afrikaans','A5'],['12:00','12:50','Social Sciences','A5']],
     Tue: [['07:30','08:20','English','A5'],['08:20','09:10','Mathematics','A5'],['09:10','10:00','Social Sciences','A5'],['10:00','10:20','Break',''],['10:20','11:10','Physical Education','Field'],['11:10','12:00','Creative Arts','Art studio'],['12:00','12:50','Afrikaans','A5']],
     Wed: [['07:30','08:20','Mathematics','A5'],['08:20','09:10','English','A5'],['09:10','10:00','Afrikaans','A5'],['10:00','10:20','Break',''],['10:20','11:10','Swimming','Aqua School'],['11:10','12:00','Life Skills','A5'],['12:00','12:50','Natural Sciences','A5']],
@@ -110,13 +119,13 @@ const TIMETABLE = {
 };
 
 const HOMEWORK = {
-  amahle: [
+  kimi: [
     { id: 'h1', subject: 'Mathematics', title: 'Times tables 2–5 worksheet', note: 'Complete both sides. Show your working on the back.', due: schoolDay(1) },
     { id: 'h2', subject: 'English', title: 'Reading log — 15 minutes a night', note: 'Parent to sign the log each evening.', due: schoolDay(3) },
     { id: 'h3', subject: 'Life Skills', title: 'Bring one clean recycled item for the class project', note: 'Bottle caps, cardboard tubes or clean tins.', due: schoolDay(-1) },
     { id: 'h4', subject: 'Afrikaans', title: 'Woordeskat: leer 10 nuwe woorde', note: 'Spelling test on the words next week.', due: schoolDay(-4), done: true },
   ],
-  tiyani: [
+  max: [
     { id: 'h5', subject: 'Technology', title: 'Scratch project: build a simple maze game', note: 'Save to the class drive before the deadline.', due: schoolDay(4) },
     { id: 'h6', subject: 'Mathematics', title: 'Fractions revision — exercise 4.3', note: 'Questions 1 to 12.', due: schoolDay(1) },
     { id: 'h7', subject: 'Social Sciences', title: 'Poster: South African biomes', note: 'A3 size, groups of two.', due: schoolDay(6) },
@@ -159,71 +168,71 @@ const ALBUMS = [
 ];
 
 const STATEMENT = [
-  { date: dayOffset(-58), desc: 'School fees — Amahle', amount: 1850 },
-  { date: dayOffset(-58), desc: 'School fees — Tiyani', amount: 1850 },
+  { date: dayOffset(-58), desc: 'School fees — Kimi', amount: 1850 },
+  { date: dayOffset(-58), desc: 'School fees — Max', amount: 1850 },
   { date: dayOffset(-55), desc: 'Payment received — EFT', amount: -3700 },
-  { date: dayOffset(-40), desc: 'Aqua School term fee — Amahle', amount: 450 },
-  { date: dayOffset(-28), desc: 'School fees — Amahle', amount: 1850 },
-  { date: dayOffset(-28), desc: 'School fees — Tiyani', amount: 1850 },
+  { date: dayOffset(-40), desc: 'Aqua School term fee — Kimi', amount: 450 },
+  { date: dayOffset(-28), desc: 'School fees — Kimi', amount: 1850 },
+  { date: dayOffset(-28), desc: 'School fees — Max', amount: 1850 },
   { date: dayOffset(-24), desc: 'Payment received — EFT', amount: -2900 },
 ];
 
 const THREADS = [
-  { id: 't1', childId: 'amahle', with: 'Mrs Van Wyk', role: 'Class teacher, 3B', messages: [
-    { from: 'them', text: 'Good afternoon Mrs Khumalo. Amahle got full marks in today\'s spelling test — she was very proud of herself!', when: 'Yesterday, 14:05' },
+  { id: 't1', childId: 'kimi', with: 'Mr Coulthard', role: 'Class teacher, 3B', messages: [
+    { from: 'them', text: 'Good afternoon Mr Verstappen. Kimi got full marks in today\'s spelling test — he was very proud of himself!', when: 'Yesterday, 14:05' },
     { from: 'me', text: 'That\'s lovely to hear, thank you for letting me know.', when: 'Yesterday, 15:40' },
   ]},
-  { id: 't2', childId: 'tiyani', with: 'Mr Botha', role: 'Class teacher, 6A', messages: [
-    { from: 'them', text: 'A reminder that Tiyani\'s Scratch project is due next week. He\'s welcome to use the computer lab at break if he needs more time.', when: 'Mon, 09:12' },
+  { id: 't2', childId: 'max', with: 'Mr Rosberg', role: 'Class teacher, 6A', messages: [
+    { from: 'them', text: 'A reminder that Max\'s Scratch project is due next week. He\'s welcome to use the computer lab at break if he needs more time.', when: 'Mon, 09:12' },
   ]},
   { id: 't3', childId: null, with: 'School office', role: 'Fees & admin', messages: [
-    { from: 'them', text: 'Hello Mrs Khumalo, a friendly reminder that the account shows R1 250,00 outstanding. Let us know if you\'d like to arrange a payment plan.', when: 'Tue, 11:30' },
+    { from: 'them', text: 'Hello Mr Verstappen, a friendly reminder that the account shows R1 250,00 outstanding. Let us know if you\'d like to arrange a payment plan.', when: 'Tue, 11:30' },
   ]},
 ];
 
 /* ---------------- Staff side ---------------- */
 
-const STAFF_USER = { name: 'Sharon Govender', title: 'Mrs', role: 'School administrator' };
+const STAFF_USER = { name: 'Claire Williams', title: 'Mrs', role: 'School administrator' };
 
 const CLASSES = [
-  { id: 'c1', name: 'Grade R Sunbirds', phase: 'montessori', teacher: 'Mrs Patel' },
-  { id: 'c2', name: 'Grade 1A', phase: 'primary', teacher: 'Mrs Nkosi' },
-  { id: 'c3', name: 'Grade 3B', phase: 'primary', teacher: 'Mrs Van Wyk' },
-  { id: 'c4', name: 'Grade 6A', phase: 'primary', teacher: 'Mr Botha' },
-  { id: 'c5', name: 'Grade 8', phase: 'high', teacher: 'Mr Adams' },
+  { id: 'c1', name: 'Grade R Sunbirds', phase: 'montessori', teacher: 'Mrs Wolff' },
+  { id: 'c2', name: 'Grade 1A', phase: 'primary', teacher: 'Mr Webber' },
+  { id: 'c3', name: 'Grade 3B', phase: 'primary', teacher: 'Mr Coulthard' },
+  { id: 'c4', name: 'Grade 6A', phase: 'primary', teacher: 'Mr Rosberg' },
+  { id: 'c5', name: 'Grade 8', phase: 'high', teacher: 'Mr Massa' },
 ];
 
 const LEARNERS = [
-  ['l1','Amahle Khumalo','c3','Naledi Khumalo',93,'overdue',1250],
-  ['l3','Liam Fourie','c3','Johan Fourie',88,'overdue',2100],
-  ['l4','Keabetswe Molefe','c3','Thabo Molefe',96,'paid',0],
-  ['l5','Ayaan Moosa','c3','Fatima Moosa',98,'paid',0],
-  ['l6','Lerato Nkosi','c3','Grace Nkosi',91,'partial',600],
-  ['l7','Daniel Pretorius','c3','Elmarie Pretorius',95,'paid',0],
-  ['l8','Zara Ismail','c3','Yusuf Ismail',99,'paid',0],
-  ['l9','Thabo Mokoena','c3','Lindiwe Mokoena',90,'paid',0],
-  ['l2','Tiyani Khumalo','c4','Naledi Khumalo',97,'paid',0],
-  ['l10','Zinhle Dlamini','c4','Precious Dlamini',99,'paid',0],
-  ['l11','Sipho Mahlangu','c4','Bongani Mahlangu',85,'overdue',1850],
-  ['l12','Mia Jacobs','c4','Carmen Jacobs',94,'paid',0],
-  ['l13','Yusuf Cassim','c4','Ridwaan Cassim',92,'partial',450],
-  ['l14','Palesa Sithole','c4','Mpho Sithole',97,'paid',0],
-  ['l15','Ethan Naidoo','c4','Kavitha Naidoo',89,'paid',0],
-  ['l16','Ethan Pillay','c2','Reshma Pillay',95,'partial',450],
-  ['l17','Aisha Patel','c2','Nadia Patel',97,'paid',0],
-  ['l18','Kagiso Radebe','c2','Lesego Radebe',93,'paid',0],
-  ['l19','Emma Coetzee','c2','Anri Coetzee',96,'paid',0],
-  ['l20','Lwazi Ndlovu','c2','Zanele Ndlovu',87,'overdue',1850],
-  ['l21','Nia Mthembu','c1','Ayanda Mthembu',94,'paid',0],
-  ['l22','Reuben Govender','c1','Priya Govender',91,'paid',0],
-  ['l23','Imaan Khan','c1','Saira Khan',98,'paid',0],
-  ['l24','Bokang Tau','c1','Dineo Tau',90,'partial',300],
-  ['l25','Lily Smit','c1','Marike Smit',96,'paid',0],
-  ['l26','Chloe van der Merwe','c5','Liezl van der Merwe',96,'paid',0],
-  ['l27','Musa Zwane','c5','Sifiso Zwane',92,'paid',0],
-  ['l28','Hannah Davids','c5','Fiona Davids',95,'paid',0],
-  ['l29','Rayyan Essop','c5','Zubair Essop',88,'overdue',2400],
-  ['l30','Kamo Molete','c5','Refilwe Molete',93,'paid',0],
+  ['l1','Kimi Verstappen','c3','Jos Verstappen',93,'overdue',1250],
+  ['l3','Lando Norris','c3','Zak Brown',88,'overdue',2100],
+  ['l4','Oscar Piastri','c3','Andrea Stella',96,'paid',0],
+  ['l5','George Russell','c3','Toto Wolff',98,'paid',0],
+  ['l6','Yuki Tsunoda','c3','Laurent Mekies',91,'partial',600],
+  ['l7','Alex Albon','c3','James Vowles',95,'paid',0],
+  ['l8','Oliver Bearman','c3','Ayao Komatsu',99,'paid',0],
+  ['l9','Isack Hadjar','c3','Alan Permane',90,'paid',0],
+  ['l2','Max Verstappen','c4','Jos Verstappen',97,'paid',0],
+  ['l10','Charles Leclerc','c4','Fred Vasseur',99,'paid',0],
+  ['l11','Carlos Sainz','c4','Carlos Sainz Sr',85,'overdue',1850],
+  ['l12','Pierre Gasly','c4','Flavio Briatore',94,'paid',0],
+  ['l13','Esteban Ocon','c4','Otmar Szafnauer',92,'partial',450],
+  ['l14','Lance Stroll','c4','Lawrence Stroll',97,'paid',0],
+  ['l15','Liam Lawson','c4','Helmut Marko',89,'paid',0],
+  ['l16','Gabriel Bortoleto','c2','Mattia Binotto',95,'partial',450],
+  ['l17','Franco Colapinto','c2','Ross Brawn',97,'paid',0],
+  ['l18','Jack Doohan','c2','Mick Doohan',93,'paid',0],
+  ['l19','Logan Sargeant','c2','Jost Capito',96,'paid',0],
+  ['l20','Nico Hulkenberg','c2','Jonathan Wheatley',87,'overdue',1850],
+  ['l21','Valtteri Bottas','c1','Graeme Lowdon',94,'paid',0],
+  ['l22','Sergio Perez','c1','Antonio Perez',91,'paid',0],
+  ['l23','Kevin Magnussen','c1','Jan Magnussen',98,'paid',0],
+  ['l24','Zhou Guanyu','c1','Alessandro Alunni Bravi',90,'partial',300],
+  ['l25','Daniel Ricciardo','c1','Mike Krack',96,'paid',0],
+  ['l26','Lewis Hamilton','c5','Anthony Hamilton',96,'paid',0],
+  ['l27','Fernando Alonso','c5','Andy Cowell',92,'paid',0],
+  ['l28','Sebastian Vettel','c5','Maurizio Arrivabene',95,'paid',0],
+  ['l29','Jenson Button','c5','Martin Whitmarsh',88,'overdue',2400],
+  ['l30','Kimi Raikkonen','c5','Ron Dennis',93,'paid',0],
 ].map(([id, name, classId, parent, attendance, feeStatus, balance]) => ({ id, name, classId, parent, attendance, feeStatus, balance }));
 
 const GRADE3_CLASS_SIZE = 26;
@@ -235,3 +244,44 @@ const SENT_SEED = [
   { id: 'n3', title: 'Fee statements sent', audience: 'Whole school', date: dayOffset(-5), reach: 284, read: 240 },
   { id: 'n4', title: 'Aqua School closed for maintenance', audience: 'Whole school', date: dayOffset(-8), reach: 284, read: 252 },
 ];
+
+/* ---------------- Tuck shop ---------------- */
+
+const SCHOOL_TODAY = schoolDay(0);
+
+const TUCK_MENU = [
+  { id: 'm3', name: 'Pizza Friday combo', desc: 'Any slice with a fruit juice', cat: 'Pizza', price: 35, icon: 'pizza', tone: '#2D1FA3', fridayOnly: true },
+  { id: 'm1', name: 'Margherita pizza slice', desc: 'Tomato, mozzarella, fresh basil', cat: 'Pizza', price: 25, icon: 'pizza', tone: '#E0AE3C' },
+  { id: 'm2', name: 'Chicken & mayo pizza slice', desc: 'A Whizzkidz favourite', cat: 'Pizza', price: 30, icon: 'pizza', tone: '#D3283E' },
+  { id: 'm4', name: 'Toasted cheese & tomato', desc: 'On wholewheat bread', cat: 'Hot food', price: 22, icon: 'sandwich', tone: '#F39A3B' },
+  { id: 'm5', name: 'Beef hot dog', desc: 'With tomato sauce', cat: 'Hot food', price: 24, icon: 'hotdog', tone: '#C2410C' },
+  { id: 'm6', name: 'Fresh fruit cup', desc: 'Seasonal fruit', cat: 'Snacks', price: 15, icon: 'apple', tone: '#4FA83D' },
+  { id: 'm7', name: 'Blueberry muffin', desc: 'Baked this morning', cat: 'Snacks', price: 14, icon: 'muffin', tone: '#7D5AB5' },
+  { id: 'm8', name: 'Fruit juice 330ml', desc: 'Apple or orange', cat: 'Drinks', price: 12, icon: 'cup', tone: '#F39A3B' },
+  { id: 'm9', name: 'Still water 500ml', desc: '', cat: 'Drinks', price: 10, icon: 'cup', tone: '#0B78C2' },
+];
+const TUCK_WALLET_SEED = 150;
+
+const TUCK_SEED = [
+  ['l3', { m1: 1, m8: 1 }], ['l4', { m2: 1 }], ['l5', { m1: 2 }], ['l6', { m4: 1, m9: 1 }], ['l7', { m5: 1, m8: 1 }],
+  ['l8', { m6: 1 }], ['l10', { m2: 1, m8: 1 }], ['l11', { m1: 1 }], ['l12', { m7: 1, m8: 1 }], ['l14', { m5: 1 }],
+  ['l16', { m1: 1, m9: 1 }], ['l17', { m6: 1, m7: 1 }], ['l19', { m4: 1 }], ['l22', { m1: 1 }], ['l26', { m2: 2 }], ['l28', { m5: 1, m8: 1 }],
+].map(([learnerId, items], i) => ({ id: `seed-${learnerId}`, learnerId, items, date: SCHOOL_TODAY, status: 'ordered', seed: true }));
+
+/* ---------------- Collection ---------------- */
+
+const COLLECTORS = [
+  { id: 'p1', name: 'Jos Verstappen', rel: 'Father', phone: '082 445 1290', car: 'Orange Ford Ranger' },
+  { id: 'p2', name: 'Sophie Kumpen', rel: 'Mother', phone: '083 210 7745', car: 'Grey Toyota Fortuner' },
+  { id: 'p3', name: 'Helmut Marko', rel: 'Family friend', phone: '072 908 3311', car: 'Silver Hyundai i20' },
+  { id: 'p4', name: 'Adrian Newey', rel: 'Lift club', phone: '079 554 2018', car: 'Blue Kia Sorento' },
+];
+
+const PICKUP_SLOTS = [
+  { id: 'end', label: 'End of school day' },
+  { id: 'sport', label: 'After sport · 14:30' },
+  { id: 'aftercare', label: 'Aftercare · 17:00' },
+];
+
+const CLASS_END = { c1: '12:00', c2: '12:30', c3: '12:20', c4: '12:50', c5: '13:30' };
+const CARS = ['White Toyota Corolla', 'Red Suzuki Swift', 'Black Ford Ranger', 'Silver VW Polo', 'Grey Honda Jazz', 'White Hyundai Tucson', 'Blue Renault Kwid'];

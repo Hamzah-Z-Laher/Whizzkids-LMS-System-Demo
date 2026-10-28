@@ -25,11 +25,15 @@
   border: 1px solid var(--glass-edge); box-shadow: 0 16px 40px -14px rgba(18, 10, 69, .35);
 }
 .tab{
-  flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   min-height: 54px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--ink-3);
 }
 .tab .icon{ width: 22px; height: 22px; position: relative; z-index: 1; }
-.tab span{ position: relative; z-index: 1; }
+.tab span{ position: relative; z-index: 1; max-width: 100%; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 360px){
+  .tabbar{ left: 8px; right: 8px; padding: 5px; }
+  .tab{ font-size: 10px; letter-spacing: -0.01em; }
+}
 .tab.on{ color: var(--navy); background: rgba(30, 18, 112, .08); }
 .count{
   min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; background: var(--blazer); color: #fff;
@@ -40,6 +44,7 @@
 /* ---------- View ---------- */
 .view{ padding: 14px 16px calc(112px + var(--safe-bottom)); outline: none; }
 .stack{ display: grid; gap: 16px; }
+.stack > *, .home-grid > *, .two-col > *{ min-width: 0; }
 
 /* ---------- Hero ---------- */
 .hero{ position: relative; overflow: hidden; border-radius: 26px; padding: 22px 20px 24px; box-shadow: var(--shadow-lg); }
@@ -228,13 +233,21 @@ body.in-thread .view{ padding-bottom: 0; }
   .tabbar{ display: none; }
 
   .side{
-    position: sticky; top: 12px; margin: 12px 0 12px 12px; height: calc(100vh - 24px); overflow-y: auto;
+    position: sticky; top: 12px; margin: 12px 0 12px 12px; height: calc(100vh - 24px); overflow: hidden;
     display: grid !important; grid-template-columns: 44px 1fr; grid-template-rows: auto 1fr auto; column-gap: 12px;
     padding: 22px 14px 16px; border-radius: 28px; box-shadow: var(--shadow-lg);
   }
   .side .emblem{ width: 44px; height: 44px; margin-left: 6px; }
   .side .wordmark{ align-self: center; margin-left: 6px; }
-  .side nav{ grid-column: 1 / -1; margin-top: 28px; }
+  /* only the menu scrolls; hidden scrollbar, soft fade at the edges */
+  .side nav{
+    grid-column: 1 / -1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    margin: 14px -14px 10px; padding: 14px 14px 18px;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(transparent, #000 14px, #000 calc(100% - 22px), transparent);
+            mask-image: linear-gradient(transparent, #000 14px, #000 calc(100% - 22px), transparent);
+  }
+  .side nav::-webkit-scrollbar{ display: none; }
   .side-group{ margin-bottom: 16px; }
   .side-group .eyebrow{ padding: 6px 12px 6px; font-size: 10.5px; }
   .side-link{
@@ -244,6 +257,12 @@ body.in-thread .view{ padding-bottom: 0; }
   .side-link:hover{ color: #fff; background: rgba(255,255,255,.07); }
   .side-link.on{ color: #fff; font-weight: 700; background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.16); box-shadow: 0 1px 0 rgba(255,255,255,.12) inset; }
   .side-link .count{ margin-left: auto; }
+  @media (max-height: 820px){
+    .side{ padding-top: 16px; }
+    .side-group{ margin-bottom: 8px; }
+    .side-group .eyebrow{ padding-top: 4px; }
+    .side-link{ padding-top: 8px; padding-bottom: 8px; }
+  }
   .side-foot{ grid-column: 1 / -1; padding: 12px; border-radius: 18px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; gap: 10px; }
   .side-foot b{ display: block; font-size: 14px; }
   .side-foot small{ display: block; font-size: 12px; color: rgba(255,255,255,.6); font-weight: 600; }

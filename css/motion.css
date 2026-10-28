@@ -127,3 +127,9 @@ body.signin-page::before{ animation: kenburns 22s var(--ease-out) both; }
   *, *::before, *::after{ animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
   .reveal{ opacity: 1; }
 }
+
+/* Phones: a single quick page transition (cheaper than animating many frosted-glass cards) */
+@keyframes page-in{ from{ opacity: 0; transform: translate3d(0, 10px, 0); } to{ opacity: 1; transform: none; } }
+.view.enter-quick{ animation: page-in .3s var(--ease-out) backwards; }
+.view.enter-quick .progress i{ transform-origin: left; animation: grow 1s var(--ease-out) .15s both; }
+@media (prefers-reduced-motion: reduce){ .view.enter-quick{ animation: none; } }

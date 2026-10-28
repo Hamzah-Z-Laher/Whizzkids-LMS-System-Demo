@@ -1,11 +1,11 @@
 /* Staff portal — routing, screens and interactions */
 
-if(store('wk_role', null) !== 'staff') location.replace('../index.html');
+if(!signedIn('staff')) location.replace('../index.html');
 
 const $ = sel => document.querySelector(sel);
 const TODAY_ISO = isoOf(TODAY);
 const DESKTOP = window.matchMedia('(min-width: 960px)');
-const S = { regClass: 'c3', regDate: TODAY_ISO, draft: null, q: '', classFilter: 'all', feeFilter: 'all' };
+const S = { gateQ: '', gateFilter: 'all', tuckDay: null, regClass: 'c3', regDate: TODAY_ISO, draft: null, q: '', classFilter: 'all', feeFilter: 'all' };
 
 const classById = id => CLASSES.find(c => c.id === id);
 const learnersIn = id => LEARNERS.filter(l => l.classId === id);
@@ -100,6 +100,13 @@ function screenOverview(){
       </div>
 
       <div class="stack">
+        <section class="card">
+          <div class="card-head"><h2>Home time &amp; tuck shop</h2></div>
+          <div class="rows">
+            <a class="row" href="#/collection"><span class="inbox-ic" style="background:var(--navy-soft);color:var(--navy)">${ICONS.car}</span><div class="grow"><div class="row-title">Collection</div><div class="row-sub">${gateList().filter(x => x.status === 'collected').length} of ${LEARNERS.length} collected${gateCount() ? ` · <b style="color:var(--blazer)">${gateCount()} at the gate</b>` : ''}</div></div><span class="chev">${ICONS.right}</span></a>
+            <a class="row" href="#/tuckshop"><span class="inbox-ic" style="background:var(--gold-soft);color:var(--warn)">${ICONS.pizza}</span><div class="grow"><div class="row-title">Tuck shop</div><div class="row-sub">${tuckOrdersFor(SCHOOL_TODAY).length} pre-orders for first break</div></div><span class="chev">${ICONS.right}</span></a>
+          </div>
+        </section>
         <section class="card card-pad">
           <div class="eyebrow">Consent forms</div>
           <h2 style="font-size:19px;margin:6px 0 4px">Grade 3 Sci-Bono outing</h2>
@@ -267,9 +274,152 @@ function screenCalendar(){
     </div>`;
 }
 
-const ROUTES = { overview: screenOverview, register: screenRegister, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
-const TITLES = { fees: 'Fees', calendar: 'Calendar & gallery' };
-const TOP_LEVEL = ['overview', 'register', 'notices', 'learners'];
+/* ---------------- Collection (gate view) ---------------- */
+const hmMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const minHM = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const gateCount = () => gateList().filter(x => x.status === 'gate').length;
+
+function gateList(){
+  const date = SCHOOL_TODAY, gate = LIVE.gate(date), plans = LIVE.pickups(date);
+  return LEARNERS.map((l, i) => {
+    const kid = CHILDREN.find(c => c.learnerId === l.id);
+    let who, slot = 'end', arrivedAt = null, changedAt = null, onceOff = false;
+    if(kid){
+      const plan = plans[kid.id] || { collector: 'p1', slot: 'end' };
+      const p = plan.onceOff ? { ...plan.onceOff, rel: 'Once-off' } : COLLECTORS.find(x => x.id === plan.collector);
+      who = p; slot = plan.slot; arrivedAt = plan.arrivedAt || null; changedAt = plan.changedAt || null; onceOff = !!plan.onceOff;
+    } else {
+      const lift = i % 7 === 3;
+      who = lift ? { name: LEARNERS[(i + 5) % LEARNERS.length].parent, rel: 'Lift club', car: CARS[(i + 2) % CARS.length] } : { name: l.parent, rel: 'Parent', car: CARS[i % CARS.length] };
+      slot = i % 6 === 2 ? 'aftercare' : 'end';
+    }
+    const time = slot === 'end' ? CLASS_END[l.classId] : slot === 'sport' ? '14:30' : '17:00';
+    let rec = gate[l.id];
+    if(!rec && !kid && date === TODAY_ISO && slot === 'end' && nowMin() > hmMin(time) + 10 && i % 4 !== 0){
+      rec = { status: 'collected', at: minHM(hmMin(time) + 3 + (i * 7) % 18), by: who.name, seed: true };
+    }
+    const status = rec && rec.status === 'collected' ? 'collected' : arrivedAt ? 'gate' : 'waiting';
+    return { l, kid, who, slot, time, rec, status, arrivedAt, changedAt, onceOff };
+  });
+}
+
+function screenCollection(){
+  const all = gateList();
+  const n = s => all.filter(x => x.status === s).length;
+  const q = S.gateQ.toLowerCase();
+  const order = { gate: 0, waiting: 1, collected: 2 };
+  const rows = all
+    .filter(x => (S.gateFilter === 'all' || x.status === S.gateFilter) && (!q || x.l.name.toLowerCase().includes(q) || x.who.name.toLowerCase().includes(q)))
+    .sort((a, b) => order[a.status] - order[b.status] || (a.status === 'collected' ? b.rec.at.localeCompare(a.rec.at) : a.time.localeCompare(b.time)));
+  const chip = (id, label, count) => `<button class="chip ${S.gateFilter === id ? 'on' : ''}" onclick="S.gateFilter='${id}'; render();">${label}${count !== undefined ? ` <span class="chip-n">${count}</span>` : ''}</button>`;
+  const onceOffs = all.filter(x => x.onceOff).length;
+  return `${head(`Gate · ${fmtLong(SCHOOL_TODAY)}`, 'Collection', 'Who is fetching each learner. Tap Collected as they leave — parents are notified instantly.')}
+    <div class="stack">
+      <div class="kpis">
+        <div class="kpi ${n('gate') ? 'alert' : ''}"><div class="eyebrow">At the gate</div><b data-count="${n('gate')}">${n('gate')}</b><div class="sub">waiting to be brought out</div></div>
+        <div class="kpi"><div class="eyebrow">Still to go</div><b data-count="${n('waiting')}">${n('waiting')}</b><div class="sub">scheduled today</div></div>
+        <div class="kpi"><div class="eyebrow">Collected</div><b data-count="${n('collected')}">${n('collected')}</b><div class="sub">of ${all.length} learners</div></div>
+        <div class="kpi"><div class="eyebrow">Once-off collectors</div><b data-count="${onceOffs}">${onceOffs}</b><div class="sub">check ID at the gate</div></div>
+      </div>
+      <label class="search">${ICONS.search}<input id="gq" placeholder="Search learner or collector" value="${esc(S.gateQ)}" oninput="S.gateQ=this.value; renderView(); const i=$('#gq'); i.focus(); i.setSelectionRange(i.value.length,i.value.length);"></label>
+      <div class="filters">${chip('all', 'Everyone')}${chip('gate', 'At the gate', n('gate'))}${chip('waiting', 'Still to go', n('waiting'))}${chip('collected', 'Collected', n('collected'))}</div>
+      <section class="card rows">${rows.map(x => `
+        <div class="row gate-row ${x.status}">
+          ${avatar(x.l.name, 'md')}
+          <div class="grow">
+            <div class="row-title">${esc(x.l.name)} <span class="row-meta">· ${esc(classById(x.l.classId).name)} · ${x.time}</span></div>
+            <div class="row-sub gate-who">${ICONS.car}<span>${esc(x.who.name)} · ${esc(x.who.rel)}${x.who.car ? ' · ' + esc(x.who.car) : ''}</span></div>
+            ${x.onceOff || x.changedAt || x.status === 'gate' ? `<div class="gate-flags">
+              ${x.status === 'gate' ? `<span class="live-dot warn">At the gate since ${x.arrivedAt}</span>` : ''}
+              ${x.onceOff ? `<span class="pill pill-warn">${ICONS.shield} Once-off · check ID •••• ${esc(x.who.idLast4)}</span>` : ''}
+              ${x.changedAt ? `<span class="pill pill-sky">Changed by parent ${x.changedAt}</span>` : ''}
+            </div>` : ''}
+          </div>
+          ${x.status === 'collected'
+            ? `<div class="gate-done"><span class="pill pill-ok">${ICONS.check} ${x.rec.at}</span>${x.rec.seed ? '' : `<button class="link" onclick="undoCollected('${x.l.id}')">Undo</button>`}</div>`
+            : `<button class="btn btn-sm ${x.status === 'gate' ? 'btn-red' : 'btn-navy'}" onclick="markCollected('${x.l.id}')">${ICONS.check} Collected</button>`}
+        </div>`).join('') || '<div class="empty">No learners match.</div>'}
+      </section>
+    </div>`;
+}
+function markCollected(learnerId){
+  const x = gateList().find(r => r.l.id === learnerId);
+  LIVE.setGate(SCHOOL_TODAY, learnerId, { status: 'collected', at: nowHM(), by: `${x.who.name} (${x.who.rel})` });
+  render();
+  toast(`${x.l.name} collected by ${x.who.name}${x.kid ? ' — parent notified' : ''}`, 'ok');
+}
+function undoCollected(learnerId){ LIVE.setGate(SCHOOL_TODAY, learnerId, null); render(); }
+
+/* ---------------- Tuck shop (kitchen view) ---------------- */
+const menuItem = id => TUCK_MENU.find(m => m.id === id);
+const itemsTotal = items => Object.entries(items).reduce((s, [id, q]) => s + menuItem(id).price * q, 0);
+const itemsSummary = items => Object.entries(items).map(([id, q]) => `${q}× ${menuItem(id).name}`).join(', ');
+function tuckOrdersFor(date){
+  const st = LIVE.tuckStatus();
+  return [...LIVE.tuckOrders().filter(o => o.date === date), ...(date === SCHOOL_TODAY ? TUCK_SEED : [])]
+    .map(o => ({ ...o, learner: LEARNERS.find(l => l.id === o.learnerId), status: st[o.id] || 'ordered', total: o.total ?? itemsTotal(o.items), live: !o.seed }));
+}
+function tuckDaysStaff(){
+  const out = [], t = parseISO(SCHOOL_TODAY);
+  while(out.length < 3){ if(!isWeekend(t)) out.push(isoOf(t)); t.setDate(t.getDate() + 1); }
+  return out;
+}
+function screenTuckshop(){
+  const day = S.tuckDay || SCHOOL_TODAY;
+  const orders = tuckOrdersFor(day);
+  const counts = {};
+  orders.forEach(o => Object.entries(o.items).forEach(([id, q]) => { counts[id] = (counts[id] || 0) + q; }));
+  const itemsN = Object.values(counts).reduce((a, b) => a + b, 0);
+  const revenue = orders.reduce((s, o) => s + o.total, 0);
+  const done = orders.filter(o => o.status === 'collected').length;
+  const pct = orders.length ? Math.round(done / orders.length * 100) : 0;
+  const byClass = CLASSES.map(c => [c, orders.filter(o => o.learner.classId === c.id).sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0))]).filter(([, l]) => l.length);
+  const label = d => d === TODAY_ISO ? 'Today' : parseISO(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+  const action = o => o.status === 'ordered'
+    ? `<button class="btn btn-sm btn-navy" onclick="setTuck('${o.id}','ready')">Mark ready</button>`
+    : o.status === 'ready'
+      ? `<button class="btn btn-sm btn-red" onclick="setTuck('${o.id}','collected')">${ICONS.check} Hand over</button>`
+      : `<span class="pill pill-ok">${ICONS.check} Handed over</span>`;
+  return `${head(`First break · ${fmtLong(day)}`, 'Tuck shop', 'Pre-orders from the parent app. Prep from the totals, then hand over by class.')}
+    <div class="stack">
+      <div class="seg day-seg" style="max-width:420px">${tuckDaysStaff().map(d => `<button class="${d === day ? 'on' : ''}" onclick="S.tuckDay='${d}'; render();">${label(d)}</button>`).join('')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="eyebrow">Orders</div><b data-count="${orders.length}">${orders.length}</b><div class="sub">${done} handed over</div></div>
+        <div class="kpi"><div class="eyebrow">Items to prep</div><b data-count="${itemsN}">${itemsN}</b><div class="sub">for first break</div></div>
+        <div class="kpi"><div class="eyebrow">Pre-paid</div><b data-count="${revenue}" data-fmt="rand">${fmtMoney(revenue).replace(/,00$/, '')}</b><div class="sub">from parent wallets</div></div>
+        <div class="kpi"><div class="eyebrow">Handed over</div><b data-count="${pct}" data-suffix="%">${pct}%</b><div class="progress" style="--c:var(--ok);margin-top:8px"><i style="width:${pct}%"></i></div></div>
+      </div>
+      ${orders.length ? `<section class="card">
+        <div class="card-head"><h2>Kitchen totals</h2>${orders.some(o => o.status === 'ordered') ? '<button class="btn btn-line btn-sm" onclick="allReady()">Mark all ready</button>' : ''}</div>
+        <div class="kitchen">${TUCK_MENU.filter(m => counts[m.id]).map(m => `<div class="kitchen-item"><span class="food" style="--c:${m.tone}">${ICONS[m.icon]}</span><b>${counts[m.id]}×</b><span>${esc(m.name)}</span></div>`).join('')}</div>
+      </section>` : ''}
+      ${byClass.map(([c, list]) => `<div class="eyebrow section-label">${esc(c.name)} · ${list.length} order${list.length > 1 ? 's' : ''}</div>
+        <section class="card rows">${list.map(o => `
+          <div class="row tuck-row ${o.status}">
+            ${avatar(o.learner.name, 'sm')}
+            <div class="grow"><div class="row-title">${esc(o.learner.name)} ${o.live ? '<span class="ribbon">App</span>' : ''}</div><div class="row-sub">${esc(itemsSummary(o.items))}</div></div>
+            <span class="row-meta nowrap m-hide-sm">${fmtMoney(o.total)}</span>
+            ${action(o)}
+          </div>`).join('')}
+        </section>`).join('') || `<section class="card"><div class="empty">${ICONS.pizza}<p>No pre-orders for ${label(day).toLowerCase()} yet.</p></div></section>`}
+    </div>`;
+}
+function setTuck(id, status){
+  LIVE.setTuckStatus(id, status);
+  const o = tuckOrdersFor(S.tuckDay || SCHOOL_TODAY).find(x => x.id === id);
+  render();
+  toast(status === 'ready' ? `${o.learner.name}'s order is ready${o.live ? ' — parent notified' : ''}` : `Handed over to ${o.learner.name}`, 'ok');
+}
+function allReady(){
+  tuckOrdersFor(S.tuckDay || SCHOOL_TODAY).filter(o => o.status === 'ordered').forEach(o => LIVE.setTuckStatus(o.id, 'ready'));
+  render();
+  toast('All orders marked ready', 'ok');
+}
+
+const ROUTES = { collection: screenCollection, tuckshop: screenTuckshop, overview: screenOverview, register: screenRegister, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
+const TITLES = { fees: 'Fees', calendar: 'Calendar & gallery', notices: 'Notices', learners: 'Learners' };
+const TOP_LEVEL = ['overview', 'register', 'collection', 'tuckshop'];
 
 /* ---------------- Chrome ---------------- */
 function parseRoute(){
@@ -289,7 +439,7 @@ function renderSide(r){
   const inboxCount = LIVE.absences().filter(a => a.date === TODAY_ISO).length;
   const link = ([id, label, icon, count]) => `<a class="side-link ${r.name === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}${label}${count ? `<span class="count">${count}</span>` : ''}</a>`;
   const groups = [
-    ['Today', [['overview', 'Overview', 'grid', inboxCount], ['register', 'Register', 'register']]],
+    ['Today', [['overview', 'Overview', 'grid', inboxCount], ['register', 'Register', 'register'], ['collection', 'Collection', 'car', gateCount()], ['tuckshop', 'Tuck shop', 'pizza']]],
     ['Communication', [['notices', 'Notices', 'megaphone'], ['calendar', 'Calendar & gallery', 'calendar']]],
     ['Records', [['learners', 'Learners', 'users'], ['fees', 'Fees', 'coins']]],
   ];
@@ -304,9 +454,9 @@ function renderSide(r){
 }
 function renderTabs(r){
   const inboxCount = LIVE.absences().filter(a => a.date === TODAY_ISO).length;
-  const tabs = [['overview', 'Overview', 'grid'], ['register', 'Register', 'register'], ['notices', 'Notices', 'megaphone'], ['learners', 'Learners', 'users']];
+  const tabs = [['overview', 'Overview', 'grid'], ['register', 'Register', 'register'], ['collection', 'Pick-up', 'car'], ['tuckshop', 'Tuck shop', 'pizza']];
   return tabs.map(([id, label, icon]) => `<a class="tab ${r.name === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}<span>${label}</span>${id === 'overview' && inboxCount ? `<span class="count">${inboxCount}</span>` : ''}</a>`).join('')
-    + `<button class="tab ${['fees', 'calendar'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
+    + `<button class="tab ${['fees', 'calendar', 'notices', 'learners'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
 }
 function renderView(){ $('#view').innerHTML = ROUTES[parseRoute().name](); if(parseRoute().name === 'notices') preview(); }
 function render(opts = {}){
@@ -324,6 +474,8 @@ function moreSheet(){
   const item = (href, label, icon) => `<a class="row" href="${href}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div><span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>${STAFF_USER.title} ${esc(STAFF_USER.name)}</h2><p class="lede">${esc(STAFF_USER.role)} · ${SCHOOL.name}</p>
     <div class="card rows menu-list">
+      ${item('#/notices', 'Notices', 'megaphone')}
+      ${item('#/learners', 'Learners', 'users')}
       ${item('#/fees', 'Fees', 'coins')}
       ${item('#/calendar', 'Calendar & gallery', 'calendar')}
       <button class="row" onclick="signOut()"><span class="ic">${ICONS.logout}</span><div class="grow"><div class="row-title">Sign out</div></div></button>
@@ -405,7 +557,7 @@ function addEvent(){
   closeSheet(); render();
   toast('Event added — families can see it now', 'ok');
 }
-function signOut(){ localStorage.removeItem('wk_role'); location.href = '../index.html'; }
+function signOut(){ setSignedIn('staff', false); location.href = '../index.html'; }
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('hashchange', () => { closeSheet(); window.scrollTo(0, 0); render({ animate: true }); });

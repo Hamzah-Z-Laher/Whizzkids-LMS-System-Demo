@@ -39,6 +39,15 @@ const ICONS = {
   grid: svg('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
   install: svg('<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M12 7.5v7M9 11.5l3 3 3-3"/>'),
   leaf: svg('<path d="M5 19c0-8 5-13.5 14-14 .5 9-5 14-13 14"/><path d="M5 19c3-4 6-6.5 9.5-8.5"/>'),
+  car: svg('<path d="M5 16.5V12l2-5h10l2 5v4.5"/><path d="M3.5 12h17"/><rect x="3.5" y="12" width="17" height="4.5" rx="1.5"/><path d="M6.5 16.5v2M17.5 16.5v2"/><circle cx="7.5" cy="14.2" r=".6"/><circle cx="16.5" cy="14.2" r=".6"/>'),
+  pizza: svg('<path d="M12 21 3.5 6.5C8.5 3.2 15.5 3.2 20.5 6.5L12 21Z"/><path d="M5.2 9.2c4.2-2.4 9.4-2.4 13.6 0"/><circle cx="10" cy="11.5" r="1"/><circle cx="14" cy="12.5" r="1"/><circle cx="12" cy="16" r="1"/>'),
+  cup: svg('<path d="M6.5 7.5h11l-1.3 12.2a1.5 1.5 0 0 1-1.5 1.3H9.3a1.5 1.5 0 0 1-1.5-1.3L6.5 7.5Z"/><path d="M5.5 7.5h13"/><path d="m12.5 7.5 2-4.5 2.5.5"/>'),
+  muffin: svg('<path d="M6 12.5h12l-1.6 7.2a1.5 1.5 0 0 1-1.5 1.1H9.1a1.5 1.5 0 0 1-1.5-1.1L6 12.5Z"/><path d="M5 12.5a7 7 0 0 1 14 0"/><path d="M10 16.5v2M14 16.5v2"/>'),
+  apple: svg('<path d="M12 7.5c-1.5-1-5.5-1.2-6.5 2.8-.9 3.7 1.6 9.2 4.2 9.7 1 .2 1.6-.4 2.3-.4s1.3.6 2.3.4c2.6-.5 5.1-6 4.2-9.7-1-4-5-3.8-6.5-2.8Z"/><path d="M12 7.5c0-2 .8-3.5 2.5-4"/>'),
+  hotdog: svg('<path d="M4.5 13.5a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3"/><path d="M3.5 12a2 2 0 0 1 2-2h13a2 2 0 0 1 0 4h-13a2 2 0 0 1-2-2Z"/><path d="M7 12c1-.8 2-.8 3 0s2 .8 3 0 2-.8 3 0"/>'),
+  sandwich: svg('<path d="M3.5 13 12 5.5l8.5 7.5"/><path d="M4 13.5h16l-1 3.5H5l-1-3.5Z"/><path d="M5.5 17h13v1.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V17Z"/>'),
+  minus: svg('<path d="M5 12h14"/>'),
+  shield: svg('<path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.8 7 9 4.1-1.2 7-4.8 7-9V6l-7-2.5Z"/><path d="m9 12 2.2 2.2L15.5 10"/>'),
   swim: svg('<path d="M3 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M3 20.5c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><circle cx="16" cy="7" r="2"/><path d="m6 14 4.5-5 3 2.5L16 10"/>'),
 };
 
@@ -101,6 +110,8 @@ function avatar(name, size = 'md', tone){
 }
 
 /* ---------------- Storage ---------------- */
+const signedIn = role => !!store('wk_session', {})[role];
+function setSignedIn(role, on){ const s = store('wk_session', {}); if(on) s[role] = true; else delete s[role]; save('wk_session', s); }
 function store(key, fallback){
   try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
   catch(e){ return fallback; }
@@ -122,7 +133,19 @@ const LIVE = {
   events: () => store('wk_live_events', []),
   addEvent: e => { const l = LIVE.events(); l.push(e); save('wk_live_events', l); },
   payments: () => store('wk_payments', []),
+  tuckOrders: () => store('wk_tuck_orders', []),
+  setTuckOrders: l => save('wk_tuck_orders', l),
+  tuckStatus: () => store('wk_tuck_status', {}),
+  setTuckStatus: (id, status) => { const m = LIVE.tuckStatus(); m[id] = status; save('wk_tuck_status', m); },
+  wallet: () => store('wk_tuck_wallet', TUCK_WALLET_SEED),
+  setWallet: v => save('wk_tuck_wallet', v),
+  pickups: date => store(`wk_pickup_${date}`, {}),
+  setPickup: (date, childId, plan) => { const m = LIVE.pickups(date); m[childId] = plan; save(`wk_pickup_${date}`, m); },
+  gate: date => store(`wk_gate_${date}`, {}),
+  setGate: (date, learnerId, rec) => { const m = LIVE.gate(date); if(rec) m[learnerId] = rec; else delete m[learnerId]; save(`wk_gate_${date}`, m); },
 };
+const nowHM = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const isFriday = iso => parseISO(iso).getDay() === 5;
 
 /* ---------------- Toast ---------------- */
 function toast(message, tone = ''){
@@ -165,7 +188,7 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSheet();
 
 /* ---------------- Motion ---------------- */
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const REVEAL_SEL = '.page-head, .hero, .learners, .kpi, .card, .section-label, .album, .photos > *, .week-col, .profile-card, .filters, .search, .reg-tools, .day-seg, .legend, .preview, .view .btn-block';
+const REVEAL_SEL = '.page-head, .hero, .promo, .learners, .kpi, .card, .section-label, .album, .photos > *, .week-col, .profile-card, .filters, .search, .reg-tools, .day-seg, .legend, .preview, .view .btn-block';
 
 function stagger(root){
   [...root.children].forEach((el, i) => el.style.setProperty('--i', i));
@@ -195,6 +218,13 @@ function countUp(root){
 /* Reveal blocks as they scroll into view, staggered per batch. Used on route changes only. */
 function animateIn(root){
   if(REDUCED_MOTION || !('IntersectionObserver' in window)) return;
+  if(!window.matchMedia('(min-width: 960px)').matches){
+    /* phones: one quick, cheap page transition instead of a per-card cascade */
+    root.classList.remove('enter-quick'); void root.offsetWidth; root.classList.add('enter-quick');
+    setTimeout(() => root.classList.remove('enter-quick'), 1200);
+    countUp(root);
+    return;
+  }
   const blocks = [...root.querySelectorAll(REVEAL_SEL)].filter(el => !el.parentElement.closest('.card, .reveal'));
   const io = new IntersectionObserver(entries => {
     entries.filter(e => e.isIntersecting).forEach((e, i) => {

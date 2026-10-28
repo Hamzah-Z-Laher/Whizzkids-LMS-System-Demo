@@ -1,6 +1,6 @@
 /* Parent app — routing, screens and interactions */
 
-if(store('wk_role', null) !== 'parent') location.replace('../index.html');
+if(!signedIn('parent')) location.replace('../index.html');
 
 const $ = sel => document.querySelector(sel);
 const P = { child: store('wk_child', CHILDREN[0].id), day: null, lightbox: null };
@@ -187,6 +187,11 @@ function screenHome(){
 
       <div class="stack">
         <section class="card">
+          <div class="card-head"><h2>Who's fetching ${SCHOOL_TODAY === TODAY_ISO ? 'today' : 'Monday'}?</h2><a class="link" href="#/collection">Collection</a></div>
+          <div class="rows">${pickupRows()}</div>
+        </section>
+
+        <section class="card">
           <div class="card-head"><h2>${esc(c.first)}'s ${isToday ? 'day' : 'Monday'}</h2><a class="link" href="#/timetable">Timetable</a></div>
           ${reg ? `<div class="status-line ${reg}">${reg === 'absent' ? ICONS.alert : ICONS.checkCircle} Marked ${reg} by ${esc(c.teacher)} this morning</div>` : ''}
           <div style="padding-bottom:10px">${lessonsHTML(c, timetableDay(), isToday)}</div>
@@ -296,7 +301,7 @@ function screenFees(){
       <a class="btn btn-line btn-block" href="#/messages/t3">${ICONS.chat} Message the office</a>
     </section>
   </div>`;
-  return `${head('Khumalo family', 'Fees & statement')}<div class="two-col stack">${statement}${side}</div>`;
+  return `${head(FAMILY_ACCOUNT.name, 'Fees & statement')}<div class="two-col stack">${statement}${side}</div>`;
 }
 
 function monthGrid(year, month, map){
@@ -458,15 +463,278 @@ function screenProfile(){
   </div>`;
 }
 
+/* ---------------- Tuck shop ---------------- */
+const menuItem = id => TUCK_MENU.find(m => m.id === id);
+const itemsTotal = items => Object.entries(items).reduce((s, [id, q]) => s + menuItem(id).price * q, 0);
+const itemsSummary = items => Object.entries(items).map(([id, q]) => `${q}× ${menuItem(id).name}`).join(', ');
+const TUCK_LABEL = { ordered: 'Ordered', ready: 'Ready at break', collected: 'Handed over' };
+const TUCK_PILL = { ordered: 'pill-navy', ready: 'pill-warn', collected: 'pill-ok' };
+const tuckStatusOf = o => LIVE.tuckStatus()[o.id] || 'ordered';
+const myOrders = () => LIVE.tuckOrders().filter(o => childById(o.childId)).sort((a, b) => b.at.localeCompare(a.at));
+const randOf = v => fmtMoney(v).replace(/,00$/, '');
+function tuckDays(){
+  const out = [], t = parseISO(SCHOOL_TODAY);
+  while(out.length < 5){ if(!isWeekend(t)) out.push(isoOf(t)); t.setDate(t.getDate() + 1); }
+  return out;
+}
+const dayLabel = iso => iso === TODAY_ISO ? 'Today' : daysFromToday(iso) === 1 ? 'Tomorrow' : parseISO(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+P.cart = {};
+
+function screenTuckshop(){
+  const c = child();
+  const day = P.tuckDay || SCHOOL_TODAY;
+  const friday = isFriday(day);
+  const nextFri = tuckDays().find(isFriday);
+  const cartIds = Object.keys(P.cart).filter(id => P.cart[id] > 0);
+  const cartItems = Object.fromEntries(cartIds.map(id => [id, P.cart[id]]));
+  const total = itemsTotal(cartItems);
+  const count = cartIds.reduce((s, id) => s + P.cart[id], 0);
+  const cats = [...new Set(TUCK_MENU.map(m => m.cat))];
+  const orders = myOrders();
+
+  const menu = cats.map(cat => `<div class="eyebrow section-label">${cat}</div>
+    <section class="card rows">${TUCK_MENU.filter(m => m.cat === cat).map(m => {
+      const off = m.fridayOnly && !friday;
+      const q = P.cart[m.id] || 0;
+      return `<div class="row menu-item ${off ? 'off' : ''}">
+        <span class="food" style="--c:${m.tone}">${ICONS[m.icon]}</span>
+        <div class="grow"><div class="row-title">${esc(m.name)}</div><div class="row-sub">${off ? 'Fridays only' : esc(m.desc)}</div></div>
+        <span class="price">${randOf(m.price)}</span>
+        ${off ? '' : `<div class="stepper">
+          ${q ? `<button aria-label="Remove one ${esc(m.name)}" onclick="cartAdd('${m.id}', -1)">${ICONS.minus}</button><b data-q="${m.id}">${q}</b>` : ''}
+          <button class="add" aria-label="Add ${esc(m.name)}" onclick="cartAdd('${m.id}', 1)">${ICONS.plus}</button>
+        </div>`}
+      </div>`;
+    }).join('')}</section>`).join('');
+
+  const cart = `<section class="card cart-card">
+    <div class="card-head"><h2>Your order</h2><span class="row-meta">${esc(c.first)} · ${dayLabel(day)}</span></div>
+    ${count ? `<div class="rows">${cartIds.map(id => `<div class="row"><b class="qty">${P.cart[id]}×</b><div class="grow">${esc(menuItem(id).name)}</div><span class="nowrap">${fmtMoney(menuItem(id).price * P.cart[id])}</span></div>`).join('')}</div>
+      <div class="cart-total"><span>Total</span><b>${fmtMoney(total)}</b></div>
+      <div style="padding:0 18px 18px"><button class="btn btn-red btn-block" onclick="placeOrder()">Place order · ${fmtMoney(total)}</button></div>`
+    : '<div class="empty" style="padding:22px 18px">Add something from the menu.</div>'}
+  </section>`;
+
+  const history = `<section class="card">
+    <div class="card-head"><h2>Orders</h2></div>
+    <div class="rows">${orders.length ? orders.map(o => {
+      const st = tuckStatusOf(o);
+      return `<div class="row">
+        <span class="food" style="--c:var(--navy-2)">${ICONS.pizza}</span>
+        <div class="grow"><div class="row-title">${esc(childById(o.childId).first)} · ${dayLabel(o.date)}</div><div class="row-sub">${esc(itemsSummary(o.items))}</div></div>
+        <div class="order-side"><span class="pill ${TUCK_PILL[st]}">${TUCK_LABEL[st]}</span>
+          ${st === 'ordered' && daysFromToday(o.date) >= 0 ? `<button class="link" onclick="cancelOrder('${o.id}')">Cancel</button>` : `<span class="row-meta">${fmtMoney(o.total)}</span>`}</div>
+      </div>`;
+    }).join('') : '<div class="empty" style="padding:22px 18px">No orders yet.</div>'}</div>
+  </section>`;
+
+  return `${head('Collect at first break', 'Tuck shop', 'Pre-order and skip the queue. Paid from your tuck shop wallet.')}
+    <div class="stack">
+      ${learnersHTML()}
+      <div class="tuck-top">
+        <section class="card wallet-card">
+          <div><div class="eyebrow" style="color:var(--ink-3)">Tuck shop wallet</div>
+          <div class="wallet-amt" data-count="${LIVE.wallet()}" data-fmt="money">${fmtMoney(LIVE.wallet())}</div></div>
+          <button class="btn btn-line btn-sm" onclick="topupSheet()">${ICONS.plus} Top up</button>
+        </section>
+        <section class="promo">
+          <span class="promo-art" aria-hidden="true">${ICONS.pizza}</span>
+          <div class="eyebrow on-dark">Every Friday</div>
+          <h2>Pizza Friday</h2>
+          <p>Any slice and a fruit juice for R35. Order by Thursday.</p>
+          ${nextFri ? `<button class="btn btn-sm promo-btn" onclick="pizzaFriday('${nextFri}')">Order for ${nextFri === TODAY_ISO ? 'today' : parseISO(nextFri).toLocaleDateString('en-GB', { weekday: 'long' })}</button>` : ''}
+        </section>
+      </div>
+      <div class="seg day-seg" role="tablist" aria-label="Order day">${tuckDays().map(d => `<button role="tab" class="${d === day ? 'on' : ''}" onclick="setTuckDay('${d}')">${dayLabel(d)}</button>`).join('')}</div>
+      <div class="two-col stack">
+        <div>${menu}</div>
+        <div class="stack tuck-side">${cart}${history}</div>
+      </div>
+    </div>
+    ${count ? `<div class="cart-bar m-only"><span><b>${count} item${count > 1 ? 's' : ''}</b> · ${fmtMoney(total)}</span><button class="btn btn-red btn-sm" onclick="placeOrder()">Place order</button></div>` : ''}`;
+}
+
+function setTuckDay(iso){
+  P.tuckDay = iso;
+  if(!isFriday(iso)) TUCK_MENU.filter(m => m.fridayOnly).forEach(m => delete P.cart[m.id]);
+  render();
+}
+function pizzaFriday(iso){
+  P.tuckDay = iso;
+  P.cart.m3 = (P.cart.m3 || 0) + 1;
+  render();
+  document.querySelector('[data-q="m3"]')?.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'center' });
+}
+function cartAdd(id, d){
+  P.cart[id] = Math.max(0, (P.cart[id] || 0) + d);
+  if(!P.cart[id]) delete P.cart[id];
+  render();
+  document.querySelector(`[data-q="${id}"]`)?.classList.add('pop');
+}
+function placeOrder(){
+  const c = child();
+  const items = { ...P.cart };
+  const total = itemsTotal(items);
+  if(!total) return;
+  if(LIVE.wallet() < total){ toast('Not enough in your tuck shop wallet', 'bad'); topupSheet(); return; }
+  const day = P.tuckDay || SCHOOL_TODAY;
+  LIVE.setWallet(LIVE.wallet() - total);
+  LIVE.setTuckOrders([...LIVE.tuckOrders(), { id: 'o-' + Date.now(), childId: c.id, learnerId: c.learnerId, date: day, items, total, at: new Date().toISOString() }]);
+  P.cart = {};
+  render();
+  toast(`Order placed — ${c.first} collects it at first break${day === TODAY_ISO ? ' today' : ', ' + fmtShort(day)}`, 'ok');
+}
+function cancelOrder(id){
+  const o = LIVE.tuckOrders().find(x => x.id === id);
+  LIVE.setTuckOrders(LIVE.tuckOrders().filter(x => x.id !== id));
+  LIVE.setWallet(LIVE.wallet() + o.total);
+  render();
+  toast(`Order cancelled — ${fmtMoney(o.total)} back in your wallet`);
+}
+function topupSheet(){
+  openSheet(`<div class="eyebrow">Tuck shop wallet</div><h2>Top up</h2>
+    <p class="lede">Balance ${fmtMoney(LIVE.wallet())}. Top-ups are instant and can be used for any of your children.</p>
+    <div class="topup-grid">${[50, 100, 200, 500].map(a => `<button class="topup" onclick="topup(${a})"><b>${randOf(a)}</b><small>Card or Instant EFT</small></button>`).join('')}</div>
+    <p class="muted" style="font-size:13px;margin-top:14px">Demo only — no money moves.</p>`);
+}
+function topup(a){ LIVE.setWallet(LIVE.wallet() + a); closeSheet(); render(); toast(`${randOf(a)} added to your tuck shop wallet`, 'ok'); }
+
+/* ---------------- Collection ---------------- */
+const collectorById = id => COLLECTORS.find(p => p.id === id);
+const pickupPlan = c => LIVE.pickups(SCHOOL_TODAY)[c.id] || { collector: 'p1', slot: 'end' };
+const planPerson = plan => plan.onceOff ? { ...plan.onceOff, rel: 'Once-off' } : collectorById(plan.collector);
+const slotTime = (c, plan) => plan.slot === 'end' ? CLASS_END[c.classId] : plan.slot === 'sport' ? '14:30' : '17:00';
+const slotLabel = plan => PICKUP_SLOTS.find(s => s.id === plan.slot).label;
+const gateRec = c => LIVE.gate(SCHOOL_TODAY)[c.learnerId];
+function pickupState(c){
+  const g = gateRec(c);
+  if(g && g.status === 'collected') return 'collected';
+  return pickupPlan(c).arrivedAt ? 'gate' : 'scheduled';
+}
+const PICKUP_LABEL = { scheduled: 'Scheduled', gate: 'At the gate', collected: 'Collected' };
+const PICKUP_PILL = { scheduled: 'pill-navy', gate: 'pill-warn', collected: 'pill-ok' };
+
+function pickupRows(){
+  return CHILDREN.map(c => {
+    const plan = pickupPlan(c), p = planPerson(plan), st = pickupState(c);
+    return `<a class="row" href="#/collection">
+      ${avatar(c.name, 'sm', 'var(--blazer)')}
+      <div class="grow"><div class="row-title">${esc(c.first)} <span class="row-meta">· ${slotTime(c, plan)}</span></div><div class="row-sub">${esc(p.name)} · ${esc(p.rel)}</div></div>
+      <span class="pill ${PICKUP_PILL[st]}">${PICKUP_LABEL[st]}</span>
+    </a>`;
+  }).join('');
+}
+
+function screenCollection(){
+  const scheduled = CHILDREN.filter(c => pickupState(c) === 'scheduled');
+  const sameDriver = scheduled.length > 1 && new Set(scheduled.map(c => JSON.stringify(planPerson(pickupPlan(c))))).size === 1;
+  const steps = st => ['scheduled', 'gate', 'collected'].map((s, i, all) => {
+    const idx = all.indexOf(st);
+    return `<div class="step ${i < idx ? 'done' : i === idx ? 'now' : ''}"><span></span>${PICKUP_LABEL[s]}</div>`;
+  }).join('');
+  return `${head(fmtLong(SCHOOL_TODAY), 'Collection', 'Tell the gate who\'s fetching, and get notified the moment your child is collected.')}
+    <div class="stack">
+      ${sameDriver ? `<button class="btn btn-navy btn-block" onclick="arrivedAll()">${ICONS.car} I'm at the gate for ${scheduled.map(c => c.first).join(' & ')}</button>` : ''}
+      <div class="pickup-grid">${CHILDREN.map(c => {
+        const plan = pickupPlan(c), p = planPerson(plan), st = pickupState(c), g = gateRec(c);
+        return `<section class="card pickup-card ${st}">
+          <div class="card-head">
+            <div class="pickup-who">${avatar(c.name, 'md', 'var(--blazer)')}<div><h2>${esc(c.first)}</h2><div class="row-meta">Grade ${esc(c.className)} · ${slotLabel(plan)} · ${slotTime(c, plan)}</div></div></div>
+            <span class="pill ${PICKUP_PILL[st]}">${PICKUP_LABEL[st]}</span>
+          </div>
+          <div class="steps">${steps(st)}</div>
+          <div class="collector">
+            ${avatar(p.name, 'md')}
+            <div class="grow"><div class="row-title">${esc(p.name)}</div><div class="row-sub">${esc(p.rel)}${p.car ? ' · ' + esc(p.car) : ''}${p.idLast4 ? ' · ID •••• ' + esc(p.idLast4) : ''}</div></div>
+            ${st === 'collected' ? '' : `<button class="btn btn-line btn-sm" onclick="pickupSheet('${c.id}')">Change</button>`}
+          </div>
+          <div class="pickup-action">
+            ${st === 'scheduled' ? `<button class="btn btn-navy btn-block" onclick="arrived('${c.id}')">${ICONS.car} I'm at the gate</button>` : ''}
+            ${st === 'gate' ? `<div class="status-line late"><span class="live-dot warn"></span>At the gate since ${plan.arrivedAt} — ${esc(c.teacher)} is bringing ${esc(c.first)} out</div>` : ''}
+            ${st === 'collected' ? `<div class="status-line present">${ICONS.checkCircle} Collected at ${g.at} by ${esc(g.by)}</div>` : ''}
+          </div>
+        </section>`;
+      }).join('')}</div>
+      <section class="card">
+        <div class="card-head"><h2>Authorised to collect</h2><button class="link" onclick="toast('New people are approved by the school office before they can collect')">Add person</button></div>
+        <div class="rows">${COLLECTORS.map(p => `<div class="row">${avatar(p.name, 'md')}<div class="grow"><div class="row-title">${esc(p.name)}</div><div class="row-sub">${esc(p.rel)} · ${esc(p.car)}</div></div><a class="icon-btn" href="tel:${p.phone.replace(/\s/g, '')}" aria-label="Call ${esc(p.name)}">${ICONS.phone}</a></div>`).join('')}</div>
+      </section>
+    </div>`;
+}
+
+function pickupSheet(childId){
+  const c = childById(childId), plan = pickupPlan(c);
+  const current = plan.onceOff ? 'once' : plan.collector;
+  openSheet(`<div class="eyebrow">${esc(c.first)} · ${fmtLong(SCHOOL_TODAY)}</div>
+    <h2>Who's collecting?</h2>
+    <div class="choices">
+      ${COLLECTORS.map(p => `<label class="choice"><input type="radio" name="who" value="${p.id}" ${current === p.id ? 'checked' : ''}>${avatar(p.name, 'sm')}<span class="grow"><b>${esc(p.name)}</b><small>${esc(p.rel)} · ${esc(p.car)}</small></span><span class="radio"></span></label>`).join('')}
+      <label class="choice"><input type="radio" name="who" value="once" id="who-once" ${current === 'once' ? 'checked' : ''}><span class="avatar avatar-sm" style="--tone:var(--warn)">${ICONS.plus}</span><span class="grow"><b>Someone else</b><small>Once-off, for today only</small></span><span class="radio"></span></label>
+    </div>
+    <div class="once-fields">
+      <label class="field"><span>Full name</span><input id="once-name" value="${esc(plan.onceOff?.name || '')}" placeholder="As on their ID"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label class="field"><span>Cellphone</span><input id="once-phone" type="tel" value="${esc(plan.onceOff?.phone || '')}" placeholder="08x xxx xxxx"></label>
+        <label class="field"><span>ID — last 4 digits</span><input id="once-id" inputmode="numeric" maxlength="4" value="${esc(plan.onceOff?.idLast4 || '')}" placeholder="0000"></label>
+      </div>
+    </div>
+    <label class="field"><span>When</span><select id="pick-slot">${PICKUP_SLOTS.map(s => `<option value="${s.id}" ${plan.slot === s.id ? 'selected' : ''}>${s.label}${s.id === 'end' ? ' · ' + CLASS_END[c.classId] : ''}</option>`).join('')}</select></label>
+    <button class="btn btn-navy btn-block" onclick="savePickup('${c.id}')">${ICONS.check} Tell the gate</button>`);
+}
+function savePickup(childId){
+  const c = childById(childId);
+  const who = document.querySelector('input[name="who"]:checked').value;
+  const plan = { slot: $('#pick-slot').value, changedAt: nowHM() };
+  if(who === 'once'){
+    const name = $('#once-name').value.trim(), idLast4 = $('#once-id').value.trim();
+    if(name.length < 3 || !/^\d{4}$/.test(idLast4)){ toast('Add their full name and the last 4 digits of their ID', 'bad'); return; }
+    plan.onceOff = { name, phone: $('#once-phone').value.trim(), idLast4 };
+  } else plan.collector = who;
+  LIVE.setPickup(SCHOOL_TODAY, childId, plan);
+  closeSheet(); render();
+  toast(`The gate knows ${planPerson(plan).name.split(' ')[0]} is fetching ${c.first}`, 'ok');
+}
+function arrived(childId){
+  const c = childById(childId);
+  LIVE.setPickup(SCHOOL_TODAY, childId, { ...pickupPlan(c), arrivedAt: nowHM() });
+  render();
+  toast(`The gate knows you're here — ${c.first} is on the way`, 'ok');
+}
+function arrivedAll(){
+  const t = nowHM();
+  CHILDREN.filter(c => pickupState(c) === 'scheduled').forEach(c => LIVE.setPickup(SCHOOL_TODAY, c.id, { ...pickupPlan(c), arrivedAt: t }));
+  render();
+  toast('The gate knows you\'re here', 'ok');
+}
+
+/* Toast when the school updates something in another tab or device view */
+let seen = { gate: {}, tuck: {} };
+function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() } }; }
+function announceLiveChanges(){
+  const gate = LIVE.gate(SCHOOL_TODAY), tuck = LIVE.tuckStatus();
+  CHILDREN.forEach(c => {
+    const g = gate[c.learnerId];
+    if(g && g.status === 'collected' && !seen.gate[c.learnerId]) toast(`${c.first} was collected at ${g.at} by ${g.by}`, 'ok');
+  });
+  myOrders().forEach(o => {
+    if(tuck[o.id] && tuck[o.id] !== seen.tuck[o.id]){
+      toast(tuck[o.id] === 'ready' ? `${childById(o.childId).first}'s tuck shop order is ready` : `${childById(o.childId).first} has collected their tuck shop order`, 'ok');
+    }
+  });
+  snapshotLive();
+}
+snapshotLive();
+
 const ROUTES = {
+  tuckshop: screenTuckshop, collection: screenCollection,
   home: screenHome, timetable: screenTimetable, diary: screenDiary, fees: screenFees,
   attendance: screenAttendance, notices: screenNotices, calendar: screenCalendar,
   gallery: screenGallery, album: screenAlbum, messages: screenMessages, profile: screenProfile,
 };
-const TITLES = { attendance: 'Attendance', notices: 'Notices', calendar: 'Calendar', gallery: 'Gallery', album: 'Gallery', messages: 'Messages', profile: 'Profile' };
+const TITLES = { tuckshop: 'Tuck shop', collection: 'Collection', attendance: 'Attendance', notices: 'Notices', calendar: 'Calendar', gallery: 'Gallery', album: 'Gallery', messages: 'Messages', profile: 'Profile' };
 const PARENT_ROUTE = { album: 'gallery', messages: 'messages' };
 const TOP_LEVEL = ['home', 'diary', 'timetable', 'fees'];
-const MORE_ROUTES = ['attendance', 'notices', 'calendar', 'gallery', 'album', 'messages', 'profile'];
+const MORE_ROUTES = ['tuckshop', 'collection', 'attendance', 'notices', 'calendar', 'gallery', 'album', 'messages', 'profile'];
 
 /* ---------------- Chrome ---------------- */
 function parseRoute(){
@@ -496,7 +764,7 @@ function renderSide(r){
   const counts = { notices: unreadNotices(), messages: unreadThreads(), fees: feesOverdue() ? '!' : 0 };
   const link = ([id, label, icon]) => `<a class="side-link ${active === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}${label}${counts[id] ? `<span class="count">${counts[id]}</span>` : ''}</a>`;
   const groups = [
-    ['Your children', [['home', 'Home', 'home'], ['timetable', 'Timetable', 'clock'], ['diary', 'Homework diary', 'book'], ['attendance', 'Attendance', 'register']]],
+    ['Your children', [['home', 'Home', 'home'], ['timetable', 'Timetable', 'clock'], ['diary', 'Homework diary', 'book'], ['attendance', 'Attendance', 'register'], ['collection', 'Collection', 'car'], ['tuckshop', 'Tuck shop', 'pizza']]],
     ['School', [['notices', 'Notices', 'megaphone'], ['calendar', 'Calendar', 'calendar'], ['gallery', 'Gallery', 'image'], ['messages', 'Messages', 'chat']]],
     ['Account', [['fees', 'Fees', 'wallet'], ['profile', 'Profile', 'user']]],
   ];
@@ -547,6 +815,8 @@ function moreSheet(){
   const item = (id, label, icon, count) => `<a class="row" href="#/${id}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div>${count ? `<span class="count">${count}</span>` : ''}<span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>More</h2>
     <div class="card rows menu-list">
+      ${item('collection', 'Collection', 'car')}
+      ${item('tuckshop', 'Tuck shop', 'pizza')}
       ${item('attendance', 'Attendance', 'register')}
       ${item('notices', 'Notices', 'megaphone', unreadNotices())}
       ${item('messages', 'Messages', 'chat', unreadThreads())}
@@ -701,7 +971,7 @@ async function installApp(){
   await deferredInstall.userChoice;
   deferredInstall = null; render();
 }
-function signOut(){ localStorage.removeItem('wk_role'); location.href = '../index.html'; }
+function signOut(){ setSignedIn('parent', false); location.href = '../index.html'; }
 
 /* ---------------- Lightbox ---------------- */
 function openLightbox(albumId, i){
@@ -740,7 +1010,7 @@ document.addEventListener('touchend', e => {
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('hashchange', () => { closeSheet(); P.day = null; window.scrollTo(0, 0); render({ animate: true }); });
-window.addEventListener('storage', () => render());
+window.addEventListener('storage', () => { announceLiveChanges(); render(); });
 DESKTOP.addEventListener('change', () => render());
 hydrateIcons();
 render({ animate: true });

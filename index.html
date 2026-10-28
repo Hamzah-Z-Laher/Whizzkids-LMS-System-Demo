@@ -70,19 +70,19 @@
     <h1>Welcome back</h1>
     <p class="lede">Sign in to see notices, homework, timetables, attendance and fees.</p>
 
-    <label class="field"><span>Email or cellphone</span><input type="email" value="naledi.khumalo@example.com" autocomplete="username"></label>
+    <label class="field"><span>Email or cellphone</span><input type="email" value="jos.verstappen@example.com" autocomplete="username"></label>
     <label class="field"><span>Password</span><input type="password" value="whizzkidz" autocomplete="current-password"></label>
 
     <div class="divider">Demo accounts</div>
     <div class="roles">
       <button class="role-btn role-parent" onclick="signIn('parent')">
         <span data-icon="users"></span>
-        <span><strong>Continue as a parent</strong><small>Naledi Khumalo · Amahle &amp; Tiyani</small></span>
+        <span><strong>Continue as a parent</strong><small>Jos Verstappen · Max &amp; Kimi</small></span>
         <span class="go" data-icon="right"></span>
       </button>
       <button class="role-btn role-staff" onclick="signIn('staff')">
         <span data-icon="register"></span>
-        <span><strong>Continue as staff</strong><small>Sharon Govender · Administrator</small></span>
+        <span><strong>Continue as staff</strong><small>Claire Williams · Administrator</small></span>
         <span class="go" data-icon="right"></span>
       </button>
     </div>
@@ -99,7 +99,7 @@
   hydrateIcons();
   stagger(document.querySelector('.glass-card'));
   function signIn(role){
-    save('wk_role', role);
+    setSignedIn(role, true);
     location.href = role === 'parent' ? 'parent/index.html' : 'staff/index.html';
   }
 </script>
