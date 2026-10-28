@@ -457,6 +457,7 @@ function screenProfile(){
           <a class="row" href="https://maps.google.com/?q=${encodeURIComponent(SCHOOL.address)}" target="_blank" rel="noopener"><span class="chev">${ICONS.pin}</span><div class="grow"><div class="row-title">${SCHOOL.address}</div><div class="row-sub">Directions</div></div></a>
         </div></section>
         <section class="card"><div class="card-head"><h2>This app</h2></div><div class="rows">${installRow()}</div></section>
+        <button class="btn btn-line btn-block" onclick="resetDemoSheet()">${ICONS.refresh} Reset demo data</button>
         <button class="btn btn-line btn-block" onclick="signOut()" style="color:var(--blazer)">${ICONS.logout} Sign out</button>
       </div>
     </div>

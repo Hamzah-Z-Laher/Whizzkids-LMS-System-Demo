@@ -478,6 +478,7 @@ function moreSheet(){
       ${item('#/learners', 'Learners', 'users')}
       ${item('#/fees', 'Fees', 'coins')}
       ${item('#/calendar', 'Calendar & gallery', 'calendar')}
+      <button class="row" onclick="resetDemoSheet()"><span class="ic">${ICONS.refresh}</span><div class="grow"><div class="row-title">Reset demo data</div><div class="row-sub">Restore the original sample data</div></div></button>
       <button class="row" onclick="signOut()"><span class="ic">${ICONS.logout}</span><div class="grow"><div class="row-title">Sign out</div></div></button>
     </div>`);
 }

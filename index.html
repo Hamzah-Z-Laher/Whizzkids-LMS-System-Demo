@@ -57,6 +57,8 @@
   .role-staff:hover{ background: rgba(255,255,255,.14); }
   .foot{ margin-top: 22px; text-align: center; font-size: 12.5px; color: rgba(255,255,255,.55); line-height: 1.7; }
   .foot a{ color: rgba(255,255,255,.85); font-weight: 600; }
+  .reset-link{ color: rgba(255,255,255,.85); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: inherit; }
+  .sheet{ color: var(--ink); }
 </style>
 </head>
 <body class="signin-page">
@@ -90,7 +92,7 @@
 
   <p class="foot">
     <a href="tel:0768974682">076 897 4682</a> · <a href="mailto:info@whizzkid.co.za">info@whizzkid.co.za</a><br>
-    Prototype with sample data
+    Prototype with sample data · <button class="reset-link" onclick="resetDemoSheet()">Reset demo</button>
   </p>
 </main>
 

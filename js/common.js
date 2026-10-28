@@ -47,6 +47,7 @@ const ICONS = {
   hotdog: svg('<path d="M4.5 13.5a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3"/><path d="M3.5 12a2 2 0 0 1 2-2h13a2 2 0 0 1 0 4h-13a2 2 0 0 1-2-2Z"/><path d="M7 12c1-.8 2-.8 3 0s2 .8 3 0 2-.8 3 0"/>'),
   sandwich: svg('<path d="M3.5 13 12 5.5l8.5 7.5"/><path d="M4 13.5h16l-1 3.5H5l-1-3.5Z"/><path d="M5.5 17h13v1.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V17Z"/>'),
   minus: svg('<path d="M5 12h14"/>'),
+  refresh: svg('<path d="M20 11.5A8 8 0 1 0 17.7 17"/><path d="M20 5v6.5h-6.5"/>'),
   shield: svg('<path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.8 7 9 4.1-1.2 7-4.8 7-9V6l-7-2.5Z"/><path d="m9 12 2.2 2.2L15.5 10"/>'),
   swim: svg('<path d="M3 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M3 20.5c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><circle cx="16" cy="7" r="2"/><path d="m6 14 4.5-5 3 2.5L16 10"/>'),
 };
@@ -261,6 +262,27 @@ function placeTabGlow(bar){
   glow.style.width = `${to.w}px`;
   lastTabPos = to;
 }
+
+/* ---------------- Demo reset ---------------- */
+function resetDemoSheet(){
+  openSheet(`<div class="eyebrow">Demo</div>
+    <h2>Reset demo data?</h2>
+    <p class="lede">This clears everything changed in this browser — notices, register marks, orders, payments, pick-ups, messages and consent forms — and restores the original sample data. You'll stay signed in.</p>
+    <button class="btn btn-red btn-block" onclick="resetDemo()">${ICONS.refresh} Reset demo</button>
+    <button class="btn btn-line btn-block" style="margin-top:10px" onclick="closeSheet()">Cancel</button>`);
+}
+function resetDemo(){
+  try{
+    Object.keys(localStorage).filter(k => k.startsWith('wk_') && k !== 'wk_session' && k !== 'wk_version').forEach(k => localStorage.removeItem(k));
+    sessionStorage.setItem('wk_was_reset', '1');
+  }catch(e){}
+  location.reload();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  try{
+    if(sessionStorage.getItem('wk_was_reset')){ sessionStorage.removeItem('wk_was_reset'); toast('Demo reset — original sample data restored', 'ok'); }
+  }catch(e){}
+});
 
 /* ---------------- Calendar file ---------------- */
 function downloadICS(ev){
