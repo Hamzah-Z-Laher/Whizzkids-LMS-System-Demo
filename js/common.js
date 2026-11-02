@@ -47,6 +47,12 @@ const ICONS = {
   hotdog: svg('<path d="M4.5 13.5a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3"/><path d="M3.5 12a2 2 0 0 1 2-2h13a2 2 0 0 1 0 4h-13a2 2 0 0 1-2-2Z"/><path d="M7 12c1-.8 2-.8 3 0s2 .8 3 0 2-.8 3 0"/>'),
   sandwich: svg('<path d="M3.5 13 12 5.5l8.5 7.5"/><path d="M4 13.5h16l-1 3.5H5l-1-3.5Z"/><path d="M5.5 17h13v1.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V17Z"/>'),
   minus: svg('<path d="M5 12h14"/>'),
+  heart: svg('<path d="M12 20s-7.5-4.6-7.5-10.1A4.2 4.2 0 0 1 12 7.3a4.2 4.2 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/>'),
+  flag: svg('<path d="M5.5 21V4"/><path d="M5.5 4.5h11l-2 4 2 4h-11"/>'),
+  star: svg('<path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z"/>'),
+  spark: svg('<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m6.3 6.3 2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/>'),
+  trophy: svg('<path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4"/><path d="M12 13.5v3.5M8.5 20.5h7M9.5 17h5v3.5h-5z"/>'),
+  medal: svg('<circle cx="12" cy="14.5" r="5.5"/><path d="M9 3.5 10.5 9M15 3.5 13.5 9M8 3.5h8"/><path d="m12 12.2.9 1.8 2 .3-1.4 1.4.3 2-1.8-1-1.8 1 .3-2-1.4-1.4 2-.3.9-1.8Z"/>'),
   refresh: svg('<path d="M20 11.5A8 8 0 1 0 17.7 17"/><path d="M20 5v6.5h-6.5"/>'),
   shield: svg('<path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.8 7 9 4.1-1.2 7-4.8 7-9V6l-7-2.5Z"/><path d="m9 12 2.2 2.2L15.5 10"/>'),
   swim: svg('<path d="M3 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M3 20.5c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><circle cx="16" cy="7" r="2"/><path d="m6 14 4.5-5 3 2.5L16 10"/>'),
@@ -134,6 +140,12 @@ const LIVE = {
   events: () => store('wk_live_events', []),
   addEvent: e => { const l = LIVE.events(); l.push(e); save('wk_live_events', l); },
   payments: () => store('wk_payments', []),
+  merits: () => store('wk_merits', []),
+  addMerits: list => save('wk_merits', [...list, ...LIVE.merits()]),
+  acks: () => store('wk_acks', {}),
+  ack: id => { const m = LIVE.acks(); m[id] = new Date().toISOString(); save('wk_acks', m); },
+  sotw: () => store('wk_sotw', []),
+  addSotw: s => save('wk_sotw', [s, ...LIVE.sotw().filter(x => !(x.week === s.week && x.classId === s.classId))]),
   tuckOrders: () => store('wk_tuck_orders', []),
   setTuckOrders: l => save('wk_tuck_orders', l),
   tuckStatus: () => store('wk_tuck_status', {}),
@@ -189,7 +201,7 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSheet();
 
 /* ---------------- Motion ---------------- */
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const REVEAL_SEL = '.page-head, .hero, .promo, .learners, .kpi, .card, .section-label, .album, .photos > *, .week-col, .profile-card, .filters, .search, .reg-tools, .day-seg, .legend, .preview, .view .btn-block';
+const REVEAL_SEL = '.page-head, .hero, .promo, .sotw-card, .learners, .kpi, .card, .section-label, .album, .photos > *, .week-col, .profile-card, .filters, .search, .reg-tools, .day-seg, .legend, .preview, .view .btn-block';
 
 function stagger(root){
   [...root.children].forEach((el, i) => el.style.setProperty('--i', i));

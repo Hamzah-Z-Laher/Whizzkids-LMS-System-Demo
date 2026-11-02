@@ -285,3 +285,87 @@ const PICKUP_SLOTS = [
 
 const CLASS_END = { c1: '12:00', c2: '12:30', c3: '12:20', c4: '12:50', c5: '13:30' };
 const CARS = ['White Toyota Corolla', 'Red Suzuki Swift', 'Black Ford Ranger', 'Silver VW Polo', 'Grey Honda Jazz', 'White Hyundai Tucson', 'Blue Renault Kwid'];
+
+/* ---------------- Merits, demerits & Student of the Week ---------------- */
+
+const MERIT_CATEGORIES = [
+  { id: 'kind', label: 'Kindness', points: 1, icon: 'heart', tone: '#E8445A' },
+  { id: 'lead', label: 'Leadership', points: 2, icon: 'flag', tone: '#2D1FA3' },
+  { id: 'academic', label: 'Academic excellence', points: 2, icon: 'book', tone: '#0B78C2' },
+  { id: 'effort', label: 'Great effort', points: 1, icon: 'star', tone: '#C8901E' },
+  { id: 'creative', label: 'Creativity', points: 1, icon: 'spark', tone: '#7D5AB5' },
+  { id: 'sport', label: 'Sportsmanship', points: 1, icon: 'trophy', tone: '#1F8A4C' },
+];
+const DEMERIT_CATEGORIES = [
+  { id: 'homework', label: 'Homework not handed in', points: 1 },
+  { id: 'late', label: 'Late for class', points: 1 },
+  { id: 'uniform', label: 'Uniform', points: 1 },
+  { id: 'disrupt', label: 'Disruptive in class', points: 2 },
+  { id: 'respect', label: 'Disrespectful behaviour', points: 2 },
+];
+const DEMERIT_MEETING_AT = 3;
+
+const teacherOfClass = classId => CLASSES.find(c => c.id === classId).teacher;
+const mRec = (learnerId, type, cat, points, day, note, extra = {}) => ({
+  id: `seed-${learnerId}-${type}-${day}-${cat}`, learnerId, type, cat, points, note,
+  by: teacherOfClass(LEARNERS.find(l => l.id === learnerId).classId), date: schoolDay(-day), ...extra,
+});
+
+const MERIT_SEED = [
+  /* Max — 23 merits, so the next Leadership award unlocks Silver */
+  mRec('l2', 'merit', 'lead', 2, 3, 'Led his group in the maths challenge'),
+  mRec('l2', 'merit', 'academic', 2, 5, 'Top mark in the fractions test'),
+  mRec('l2', 'merit', 'kind', 1, 6, 'Helped a new learner find his way around'),
+  mRec('l2', 'merit', 'effort', 1, 8, 'Rewrote his essay without being asked'),
+  mRec('l2', 'merit', 'lead', 2, 10, 'Organised the class clean-up'),
+  mRec('l2', 'merit', 'sport', 1, 12, 'Great sportsmanship at soccer practice'),
+  mRec('l2', 'merit', 'academic', 2, 14, 'Excellent science project'),
+  mRec('l2', 'merit', 'kind', 1, 15, 'Shared his lunch with a friend'),
+  mRec('l2', 'merit', 'creative', 1, 17, 'Imaginative poster for Heritage Day'),
+  mRec('l2', 'merit', 'effort', 1, 19, 'Stayed after class to finish his project'),
+  mRec('l2', 'merit', 'academic', 2, 21, 'Full marks in the spelling bee'),
+  mRec('l2', 'merit', 'lead', 2, 23, 'Captained the class quiz team'),
+  mRec('l2', 'merit', 'sport', 1, 24, 'Encouraged teammates at the gala'),
+  mRec('l2', 'merit', 'kind', 1, 26, 'Comforted a classmate who was upset'),
+  mRec('l2', 'merit', 'effort', 1, 27, 'Neat and complete homework all week'),
+  mRec('l2', 'merit', 'creative', 1, 28, 'Original Scratch animation'),
+  mRec('l2', 'merit', 'effort', 1, 29, 'Big improvement in handwriting'),
+  mRec('l2', 'demerit', 'late', 1, 11, 'Arrived after the bell', { acked: true }),
+  /* Kimi — 8 merits and one demerit waiting for acknowledgement */
+  mRec('l1', 'merit', 'academic', 2, 1, 'Full marks in the spelling test'),
+  mRec('l1', 'merit', 'kind', 1, 2, 'Helped tidy the reading corner'),
+  mRec('l1', 'merit', 'effort', 1, 4, 'Worked hard on his times tables'),
+  mRec('l1', 'merit', 'kind', 1, 7, 'Included a new friend at break'),
+  mRec('l1', 'merit', 'creative', 1, 9, 'Beautiful bottle-cap artwork'),
+  mRec('l1', 'merit', 'kind', 1, 13, 'Thanked the tuck shop staff'),
+  mRec('l1', 'merit', 'creative', 1, 16, 'Lovely story in creative writing'),
+  mRec('l1', 'demerit', 'homework', 1, 1, 'Recycled item for the class project was not brought in'),
+  /* Everyone else — a believable spread for the staff class view */
+  ...LEARNERS.filter(l => l.id !== 'l1' && l.id !== 'l2').flatMap((l, i) => {
+    const merits = Array.from({ length: 4 + (i * 7) % 11 }, (_, k) => {
+      const cat = MERIT_CATEGORIES[(i + k) % MERIT_CATEGORIES.length];
+      return mRec(l.id, 'merit', cat.id, cat.points, 2 + (k * 3 + i) % 28, '');
+    });
+    const demerits = l.id === 'l11' ? 3 : l.id === 'l3' ? 2 : i % 5 === 1 ? 1 : 0;
+    return [...merits, ...Array.from({ length: demerits }, (_, k) => mRec(l.id, 'demerit', DEMERIT_CATEGORIES[(i + k) % 3].id, 1, 3 + k * 6, '', { acked: k > 0 }))];
+  }),
+];
+
+function weekStartISO(iso){ const d = parseISO(iso); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return isoOf(d); }
+const THIS_WEEK = weekStartISO(SCHOOL_TODAY);
+const weeksAgo = n => { const d = parseISO(THIS_WEEK); d.setDate(d.getDate() - 7 * n); return isoOf(d); };
+const sotw = (week, classId, learnerId, reason) => ({ id: `sotw-${week}-${classId}`, week, classId, learnerId, reason, by: teacherOfClass(classId) });
+
+const SOTW_SEED = [
+  sotw(THIS_WEEK, 'c1', 'l23', 'Always the first to help tidy up after play time'),
+  sotw(THIS_WEEK, 'c2', 'l18', 'Read his first chapter book all by himself'),
+  sotw(THIS_WEEK, 'c5', 'l27', 'Mentored the Grade 6s during the coding club'),
+  sotw(weeksAgo(1), 'c3', 'l4', 'Outstanding effort in the maths olympiad'),
+  sotw(weeksAgo(1), 'c4', 'l10', 'Brilliant science fair project'),
+  sotw(weeksAgo(1), 'c1', 'l21', 'Kind and patient with the younger children'),
+  sotw(weeksAgo(2), 'c3', 'l5', 'Led the class assembly with confidence'),
+  sotw(weeksAgo(2), 'c4', 'l14', 'Huge improvement in his reading'),
+  sotw(weeksAgo(3), 'c4', 'l2', 'Organised the class market day and raised R1 200 for charity'),
+  sotw(weeksAgo(3), 'c3', 'l7', 'Always encouraging his classmates'),
+];
+const SOTW_REASONS = ['Kindness to others', 'Outstanding effort', 'Leadership in class', 'Academic excellence', 'Always helpful', 'Big improvement'];

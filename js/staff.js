@@ -104,6 +104,7 @@ function screenOverview(){
           <div class="card-head"><h2>Home time &amp; tuck shop</h2></div>
           <div class="rows">
             <a class="row" href="#/collection"><span class="inbox-ic" style="background:var(--navy-soft);color:var(--navy)">${ICONS.car}</span><div class="grow"><div class="row-title">Collection</div><div class="row-sub">${gateList().filter(x => x.status === 'collected').length} of ${LEARNERS.length} collected${gateCount() ? ` · <b style="color:var(--blazer)">${gateCount()} at the gate</b>` : ''}</div></div><span class="chev">${ICONS.right}</span></a>
+            <a class="row" href="#/merits" onclick="S.mTab='sotw'"><span class="inbox-ic" style="background:var(--gold-soft);color:#A9760A">${ICONS.trophy}</span><div class="grow"><div class="row-title">Student of the Week</div><div class="row-sub">${CLASSES.filter(c => sotwFor(c.id)).length} of ${CLASSES.length} classes chosen · ${LIVE.merits().filter(r => r.date === TODAY_ISO && r.type === 'merit').length} merits today</div></div><span class="chev">${ICONS.right}</span></a>
             <a class="row" href="#/tuckshop"><span class="inbox-ic" style="background:var(--gold-soft);color:var(--warn)">${ICONS.pizza}</span><div class="grow"><div class="row-title">Tuck shop</div><div class="row-sub">${tuckOrdersFor(SCHOOL_TODAY).length} pre-orders for first break</div></div><span class="chev">${ICONS.right}</span></a>
           </div>
         </section>
@@ -417,8 +418,138 @@ function allReady(){
   toast('All orders marked ready', 'ok');
 }
 
-const ROUTES = { collection: screenCollection, tuckshop: screenTuckshop, overview: screenOverview, register: screenRegister, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
-const TITLES = { fees: 'Fees', calendar: 'Calendar & gallery', notices: 'Notices', learners: 'Learners' };
+/* ---------------- Merits & Student of the Week ---------------- */
+S.mTab = 'award'; S.mClass = 'c4'; S.mSel = []; S.mType = 'merit'; S.mCat = null;
+const weekLabel = iso => `Week of ${parseISO(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
+
+function screenMerits(){
+  const tabs = [['award', 'Award'], ['class', 'Class totals'], ['sotw', 'Student of the Week']];
+  const body = S.mTab === 'class' ? meritsClassView() : S.mTab === 'sotw' ? meritsSotwView() : meritsAwardView();
+  return `${head('Recognition', 'Merits', 'Recognise learners in a couple of taps. Families see it on their phone straight away.')}
+    <div class="stack">
+      <div class="seg day-seg" style="max-width:520px">${tabs.map(([id, label]) => `<button class="${S.mTab === id ? 'on' : ''}" onclick="S.mTab='${id}'; render();">${label}</button>`).join('')}</div>
+      ${body}
+    </div>`;
+}
+
+function meritsAwardView(){
+  const list = learnersIn(S.mClass);
+  const cats = S.mType === 'merit' ? MERIT_CATEGORIES : DEMERIT_CATEGORIES;
+  const cat = cats.find(c => c.id === S.mCat);
+  const n = S.mSel.length;
+  const today = LIVE.merits().filter(r => r.date === TODAY_ISO);
+  const names = S.mSel.map(id => LEARNERS.find(l => l.id === id).name.split(' ')[0]);
+  const label = !n ? 'Choose learners' : !cat ? 'Choose a category' : `${S.mType === 'merit' ? 'Award +' : 'Give −'}${cat.points} to ${n === 1 ? names[0] : n + ' learners'}`;
+  return `<div class="two-col stack">
+    <section class="card card-pad award">
+      <div class="eyebrow award-step">1 · Class</div>
+      <div class="filters">${CLASSES.map(c => `<button class="chip ${S.mClass === c.id ? 'on' : ''}" onclick="S.mClass='${c.id}'; S.mSel=[]; render();">${esc(c.name)}</button>`).join('')}</div>
+      <div class="eyebrow award-step">2 · Learners <span class="row-meta">${n ? n + ' selected' : 'tap to select'}</span></div>
+      <div class="pick-grid">${list.map(l => `<button class="pick ${S.mSel.includes(l.id) ? 'on' : ''}" aria-pressed="${S.mSel.includes(l.id)}" onclick="togglePick('${l.id}')">${avatar(l.name, 'sm')}<span>${esc(l.name.split(' ')[0])}</span></button>`).join('')}</div>
+      <div class="eyebrow award-step">3 · What for</div>
+      <div class="seg" style="margin-bottom:12px"><button class="${S.mType === 'merit' ? 'on' : ''}" onclick="S.mType='merit'; S.mCat=null; render();">Merit</button><button class="${S.mType === 'demerit' ? 'on' : ''}" onclick="S.mType='demerit'; S.mCat=null; render();">Demerit</button></div>
+      <div class="cat-grid">${cats.map(c => `<button class="cat-chip ${S.mType} ${S.mCat === c.id ? 'on' : ''}" onclick="S.mCat='${c.id}'; render();">
+        ${S.mType === 'merit' ? `<span class="food" style="--c:${c.tone}">${ICONS[c.icon]}</span>` : `<span class="food" style="--c:var(--blazer)">${ICONS.alert}</span>`}
+        <span class="grow">${esc(c.label)}</span><b>${S.mType === 'merit' ? '+' : '−'}${c.points}</b></button>`).join('')}</div>
+      <label class="field" style="margin-top:14px"><span>Note for the family (optional)</span><input id="m-note" placeholder="${S.mType === 'merit' ? 'e.g. Led his group in the maths challenge' : 'e.g. Second time this week'}"></label>
+      <button class="btn ${S.mType === 'merit' ? 'btn-navy' : 'btn-red'} btn-block" ${n && cat ? '' : 'disabled'} onclick="awardMerits()">${S.mType === 'merit' ? ICONS.star : ICONS.alert} ${label}</button>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Awarded today</h2><span class="live-dot">Live</span></div>
+      <div class="rows">${today.map(r => {
+        const l = LEARNERS.find(x => x.id === r.learnerId), c = catOf(r.type, r.cat);
+        return `<div class="row">${avatar(l.name, 'sm')}<div class="grow"><div class="row-title">${esc(l.name)}</div><div class="row-sub">${esc(c.label)}${r.note ? ' · ' + esc(r.note) : ''}</div></div><span class="pts ${r.type === 'merit' ? 'plus' : 'minus'}">${r.type === 'merit' ? '+' : '−'}${r.points}</span></div>`;
+      }).join('') || `<div class="empty">${ICONS.star}<p>Nothing awarded yet today.</p></div>`}</div>
+    </section>
+  </div>`;
+}
+function togglePick(id){
+  S.mSel = S.mSel.includes(id) ? S.mSel.filter(x => x !== id) : [...S.mSel, id];
+  const note = $('#m-note')?.value;
+  render();
+  if(note) $('#m-note').value = note;
+}
+function awardMerits(){
+  const cat = catOf(S.mType, S.mCat);
+  if(!S.mSel.length || !cat) return;
+  const note = $('#m-note').value.trim(), at = new Date().toISOString();
+  const recs = S.mSel.map((learnerId, i) => ({ id: `m-${Date.now()}-${i}`, learnerId, type: S.mType, cat: cat.id, points: cat.points, note, by: teacherOfClass(S.mClass), date: TODAY_ISO, at }));
+  LIVE.addMerits(recs);
+  const fam = recs.filter(r => CHILDREN.some(c => c.learnerId === r.learnerId)).length;
+  const n = recs.length;
+  S.mSel = []; S.mCat = null;
+  render();
+  toast(`${S.mType === 'merit' ? 'Merit' : 'Demerit'} sent to ${n} famil${n === 1 ? 'y' : 'ies'}${fam ? ' — on their phone now' : ''}`, 'ok');
+}
+
+function meritsClassView(){
+  const list = learnersIn(S.mClass).map(l => ({ l, t: meritTotals(l.id), last: meritsFor(l.id)[0] }));
+  const flagged = list.filter(x => x.t.demerits >= DEMERIT_MEETING_AT).length;
+  return `<div class="filters">${CLASSES.map(c => `<button class="chip ${S.mClass === c.id ? 'on' : ''}" onclick="S.mClass='${c.id}'; render();">${esc(c.name)}</button>`).join('')}</div>
+    ${flagged ? `<div class="status-line absent" style="margin:0">${ICONS.alert} ${flagged} learner${flagged > 1 ? 's have' : ' has'} ${DEMERIT_MEETING_AT}+ demerits this term — consider a parent meeting</div>` : ''}
+    <section class="card">
+      <div class="card-head"><h2>${esc(classById(S.mClass).name)}</h2><span class="row-meta">Staff only · A–Z</span></div>
+      <table class="data">
+        <thead><tr><th>Learner</th><th>Last</th><th style="text-align:right">Merits</th><th style="text-align:right">Demerits</th></tr></thead>
+        <tbody>${list.map(x => `<tr onclick="meritLearnerSheet('${x.l.id}')">
+          <td><span class="who">${avatar(x.l.name, 'sm')}${esc(x.l.name)}</span></td>
+          <td class="m-sub">${x.last ? `${esc(catOf(x.last.type, x.last.cat).label)} · ${relAgo(x.last.date)}` : '—'}</td>
+          <td class="num m-right"><span class="pts plus">${x.t.merits}</span>${x.t.demerits ? ` <span class="pts minus m-only">−${x.t.demerits}</span>` : ''}</td>
+          <td class="num m-hide">${x.t.demerits >= DEMERIT_MEETING_AT ? `<span class="pill pill-bad">${x.t.demerits} · meeting</span>` : x.t.demerits ? `<span class="pts minus">${x.t.demerits}</span>` : '<span class="row-meta">0</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </section>`;
+}
+function meritLearnerSheet(id){
+  const l = LEARNERS.find(x => x.id === id), t = meritTotals(id);
+  openSheet(`<div style="display:flex;align-items:center;gap:14px;margin:6px 44px 16px 0">${avatar(l.name, 'lg')}<div><h2 style="margin:0">${esc(l.name)}</h2><p class="muted">${esc(classById(l.classId).name)} · ${t.merits} merits · ${t.demerits} demerits</p></div></div>
+    <div class="card rows">${meritsFor(id).slice(0, 12).map(r => {
+      const c = catOf(r.type, r.cat);
+      return `<div class="row"><div class="grow"><div class="row-title">${esc(c.label)}</div><div class="row-sub">${r.note ? esc(r.note) + ' · ' : ''}${esc(r.by)} · ${relAgo(r.date)}</div></div>
+        <div class="order-side"><span class="pts ${r.type === 'merit' ? 'plus' : 'minus'}">${r.type === 'merit' ? '+' : '−'}${r.points}</span>${r.type === 'demerit' ? (isAcked(r) ? '<span class="pill pill-ok">Parent saw it</span>' : '<span class="pill pill-warn">Not seen yet</span>') : ''}</div></div>`;
+    }).join('')}</div>`);
+}
+
+function meritsSotwView(){
+  const past = allSotw().filter(s => s.week !== THIS_WEEK).sort((a, b) => b.week.localeCompare(a.week)).slice(0, 8);
+  return `<section class="card">
+      <div class="card-head"><h2>${weekLabel(THIS_WEEK)}</h2><span class="row-meta">${CLASSES.filter(c => sotwFor(c.id)).length} of ${CLASSES.length} chosen</span></div>
+      <div class="rows">${CLASSES.map(c => {
+        const s = sotwFor(c.id), l = s && LEARNERS.find(x => x.id === s.learnerId);
+        return `<div class="row">
+          ${s ? avatar(l.name, 'md', 'var(--gold)') : `<span class="food" style="--c:var(--ink-3)">${ICONS.star}</span>`}
+          <div class="grow"><div class="row-title">${esc(c.name)}</div><div class="row-sub">${s ? `<b>${esc(l.name)}</b> · ${esc(s.reason)}` : `${esc(c.teacher)} hasn't chosen yet`}</div></div>
+          ${s ? `<span class="pill pill-ok">${ICONS.check} Published</span>` : `<button class="btn btn-sm btn-navy" onclick="sotwSheet('${c.id}')">${ICONS.star} Choose</button>`}
+        </div>`;
+      }).join('')}</div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Previous weeks</h2></div>
+      <div class="rows">${past.map(s => { const l = LEARNERS.find(x => x.id === s.learnerId); return `<div class="row">${avatar(l.name, 'sm')}<div class="grow"><div class="row-title">${esc(l.name)} <span class="row-meta">· ${esc(classById(s.classId).name)}</span></div><div class="row-sub">${esc(s.reason)}</div></div><span class="row-meta nowrap">${parseISO(s.week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span></div>`; }).join('')}</div>
+    </section>`;
+}
+function sotwSheet(classId){
+  const c = classById(classId);
+  openSheet(`<div class="eyebrow">${esc(c.name)} · ${weekLabel(THIS_WEEK)}</div>
+    <h2>Student of the Week</h2>
+    <div class="choices">${learnersIn(classId).map((l, i) => `<label class="choice"><input type="radio" name="sotw" value="${l.id}" ${i === 0 ? 'checked' : ''}>${avatar(l.name, 'sm')}<span class="grow"><b>${esc(l.name)}</b><small>${meritTotals(l.id).merits} merits this term</small></span><span class="radio"></span></label>`).join('')}</div>
+    <div class="eyebrow" style="margin:4px 0 8px;color:var(--ink-3)">Why</div>
+    <div class="filters" style="flex-wrap:wrap;margin-bottom:10px">${SOTW_REASONS.map(r => `<button class="chip" onclick="$('#sotw-reason').value='${r}'">${r}</button>`).join('')}</div>
+    <label class="field"><span>Reason families will see</span><textarea id="sotw-reason" placeholder="e.g. Always the first to help a classmate"></textarea></label>
+    <button class="btn btn-navy btn-block" onclick="publishSotw('${classId}')">${ICONS.trophy} Publish to families</button>`);
+}
+function publishSotw(classId){
+  const learnerId = document.querySelector('input[name="sotw"]:checked').value;
+  const reason = $('#sotw-reason').value.trim();
+  if(reason.length < 4){ toast('Add a short reason for the family', 'bad'); return; }
+  LIVE.addSotw({ id: `sotw-${THIS_WEEK}-${classId}-${Date.now()}`, week: THIS_WEEK, classId, learnerId, reason, by: teacherOfClass(classId), at: new Date().toISOString() });
+  closeSheet(); render();
+  confetti();
+  toast(`${LEARNERS.find(l => l.id === learnerId).name} is Student of the Week — family notified`, 'ok');
+}
+
+const ROUTES = { merits: screenMerits, collection: screenCollection, tuckshop: screenTuckshop, overview: screenOverview, register: screenRegister, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
+const TITLES = { merits: 'Merits', fees: 'Fees', calendar: 'Calendar & gallery', notices: 'Notices', learners: 'Learners' };
 const TOP_LEVEL = ['overview', 'register', 'collection', 'tuckshop'];
 
 /* ---------------- Chrome ---------------- */
@@ -441,7 +572,7 @@ function renderSide(r){
   const groups = [
     ['Today', [['overview', 'Overview', 'grid', inboxCount], ['register', 'Register', 'register'], ['collection', 'Collection', 'car', gateCount()], ['tuckshop', 'Tuck shop', 'pizza']]],
     ['Communication', [['notices', 'Notices', 'megaphone'], ['calendar', 'Calendar & gallery', 'calendar']]],
-    ['Records', [['learners', 'Learners', 'users'], ['fees', 'Fees', 'coins']]],
+    ['Records', [['learners', 'Learners', 'users'], ['merits', 'Merits', 'trophy'], ['fees', 'Fees', 'coins']]],
   ];
   return `<img class="emblem" src="../assets/brand/emblem.png" alt="Whizzkidz Academy crest">
     ${wordmark('light')}
@@ -456,7 +587,7 @@ function renderTabs(r){
   const inboxCount = LIVE.absences().filter(a => a.date === TODAY_ISO).length;
   const tabs = [['overview', 'Overview', 'grid'], ['register', 'Register', 'register'], ['collection', 'Pick-up', 'car'], ['tuckshop', 'Tuck shop', 'pizza']];
   return tabs.map(([id, label, icon]) => `<a class="tab ${r.name === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}<span>${label}</span>${id === 'overview' && inboxCount ? `<span class="count">${inboxCount}</span>` : ''}</a>`).join('')
-    + `<button class="tab ${['fees', 'calendar', 'notices', 'learners'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
+    + `<button class="tab ${['fees', 'calendar', 'notices', 'learners', 'merits'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
 }
 function renderView(){ $('#view').innerHTML = ROUTES[parseRoute().name](); if(parseRoute().name === 'notices') preview(); }
 function render(opts = {}){
@@ -474,6 +605,7 @@ function moreSheet(){
   const item = (href, label, icon) => `<a class="row" href="${href}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div><span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>${STAFF_USER.title} ${esc(STAFF_USER.name)}</h2><p class="lede">${esc(STAFF_USER.role)} · ${SCHOOL.name}</p>
     <div class="card rows menu-list">
+      ${item('#/merits', 'Merits & Student of the Week', 'trophy')}
       ${item('#/notices', 'Notices', 'megaphone')}
       ${item('#/learners', 'Learners', 'users')}
       ${item('#/fees', 'Fees', 'coins')}

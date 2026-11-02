@@ -73,6 +73,11 @@ function attentionItems(){
       items.push({ icon: 'book', title: h.title, sub: `${c.first} · ${h.subject} · ${relDue(h.due)}`, action: 'View', run: `hwSheet('${h.id}')` });
     });
   });
+  CHILDREN.forEach(c => {
+    const t = meritTotals(c.learnerId);
+    t.unacked.forEach(r => items.push({ icon: 'alert', title: `Demerit: ${catOf('demerit', r.cat).label}`, sub: `${c.first} · ${r.by} · ${relAgo(r.date)}`, action: 'View', run: `meritSheet('${r.id}')` }));
+    if(t.demerits >= DEMERIT_MEETING_AT) items.push({ urgent: true, icon: 'users', title: `${c.first} has ${t.demerits} demerits this term`, sub: `${c.teacher} would like to meet`, action: 'Book', run: `toast('Meeting request sent to ${c.teacher}', 'ok')` });
+  });
   if(feesOverdue()){
     items.push({ urgent: true, icon: 'wallet', title: `${fmtMoney(balance())} in fees is overdue`, sub: `Was due ${fmtShort(FAMILY_ACCOUNT.dueDate)} · account ${FAMILY_ACCOUNT.number}`, action: 'Pay', run: 'paySheet()' });
   }
@@ -164,6 +169,7 @@ function screenHome(){
       </section>
     </div>
 
+    ${CHILDREN.map(k => myWin(k) ? sotwCard(k, myWin(k)) : '').join('')}
     ${learnersHTML()}
 
     <div class="home-grid">
@@ -196,6 +202,8 @@ function screenHome(){
           ${reg ? `<div class="status-line ${reg}">${reg === 'absent' ? ICONS.alert : ICONS.checkCircle} Marked ${reg} by ${esc(c.teacher)} this morning</div>` : ''}
           <div style="padding-bottom:10px">${lessonsHTML(c, timetableDay(), isToday)}</div>
         </section>
+
+        ${achievementsHomeCard()}
 
         <section class="card">
           <div class="card-head"><h2>Coming up</h2><a class="link" href="#/calendar">Calendar</a></div>
@@ -709,13 +717,17 @@ function arrivedAll(){
 }
 
 /* Toast when the school updates something in another tab or device view */
-let seen = { gate: {}, tuck: {} };
-function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() } }; }
+let seen = { gate: {}, tuck: {}, merits: [] };
+function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() }, merits: LIVE.merits().map(r => r.id) }; }
 function announceLiveChanges(){
   const gate = LIVE.gate(SCHOOL_TODAY), tuck = LIVE.tuckStatus();
   CHILDREN.forEach(c => {
     const g = gate[c.learnerId];
     if(g && g.status === 'collected' && !seen.gate[c.learnerId]) toast(`${c.first} was collected at ${g.at} by ${g.by}`, 'ok');
+  });
+  LIVE.merits().filter(r => !seen.merits.includes(r.id)).forEach(r => {
+    const kid = CHILDREN.find(k => k.learnerId === r.learnerId);
+    if(kid) toast(r.type === 'merit' ? `+${r.points} ${catOf('merit', r.cat).label} for ${kid.first} — ${r.by}` : `${kid.first} received a demerit — ${r.by}`, r.type === 'merit' ? 'ok' : 'bad');
   });
   myOrders().forEach(o => {
     if(tuck[o.id] && tuck[o.id] !== seen.tuck[o.id]){
@@ -726,16 +738,205 @@ function announceLiveChanges(){
 }
 snapshotLive();
 
+/* ---------------- Achievements: merits, badges & Student of the Week ---------------- */
+function badgeCtx(c){
+  const month = TODAY_ISO.slice(0, 7);
+  const att = Object.entries(attendanceMap(c)).filter(([iso]) => iso.startsWith(month));
+  return {
+    attendanceClean: att.length > 0 && att.every(([, r]) => r.status === 'present'),
+    homeworkClean: HOMEWORK[c.id].every(h => isDone(h) || daysFromToday(h.due) >= 0),
+    aqua: c.aqua,
+  };
+}
+const childBadges = c => badgesFor(c.learnerId, badgeCtx(c));
+const myWin = c => { const s = sotwFor(c.classId); return s && s.learnerId === c.learnerId ? s : null; };
+const weekLabel = iso => `week of ${parseISO(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
+
+function sotwCard(c, s){
+  return `<section class="sotw-card">
+    <span class="sotw-art" aria-hidden="true">${ICONS.trophy}</span>
+    <div class="eyebrow on-dark">Student of the Week · Grade ${esc(c.className)}</div>
+    <h2>${esc(c.first)} is Student of the Week!</h2>
+    <p>“${esc(s.reason)}” — ${esc(s.by)}</p>
+    <button class="btn btn-sm sotw-btn" onclick="certificateSheet('${c.id}', '${s.id}')">${ICONS.medal} View certificate</button>
+  </section>`;
+}
+
+function achievementsHomeCard(){
+  return `<section class="card">
+    <div class="card-head"><h2>Achievements</h2><a class="link" href="#/achievements">Badges</a></div>
+    <div class="rows">${CHILDREN.map(c => {
+      const t = meritTotals(c.learnerId), earned = childBadges(c).filter(b => b.earned);
+      const top = [...earned].reverse().find(b => b.kind === 'tier') || earned[0];
+      return `<a class="row" href="#/achievements" onclick="P.child='${c.id}'; save('wk_child','${c.id}')">
+        ${top ? medalHTML(top, 'sm') : avatar(c.name, 'sm')}
+        <div class="grow"><div class="row-title">${esc(c.first)}</div><div class="row-sub">${t.merits} merits · ${earned.length} badges${t.demerits ? ` · ${t.demerits} demerit${t.demerits > 1 ? 's' : ''}` : ''}</div></div>
+        <span class="chev">${ICONS.right}</span>
+      </a>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+function meritRow(r, withAck = true){
+  const c = catOf(r.type, r.cat), merit = r.type === 'merit';
+  return `<button class="row merit-row" onclick="meritSheet('${r.id}')">
+    <span class="food" style="--c:${merit ? c.tone : 'var(--blazer)'}">${ICONS[merit ? c.icon : 'alert']}</span>
+    <div class="grow"><div class="row-title">${esc(c.label)}</div><div class="row-sub">${r.note ? esc(r.note) + ' · ' : ''}${esc(r.by)} · ${relAgo(r.date)}</div></div>
+    <div class="order-side">
+      <span class="pts ${merit ? 'plus' : 'minus'}">${merit ? '+' : '−'}${r.points}</span>
+      ${!merit && withAck ? (isAcked(r) ? '<span class="row-meta">Acknowledged</span>' : '<span class="pill pill-bad">Needs your OK</span>') : ''}
+    </div>
+  </button>`;
+}
+
+function screenAchievements(){
+  const c = child();
+  const t = meritTotals(c.learnerId);
+  const badges = childBadges(c);
+  const earned = badges.filter(b => b.earned).length;
+  const nt = nextTier(t.merits);
+  const recs = meritsFor(c.learnerId);
+  const win = myWin(c);
+  const wall = CLASSES.map(k => [k, sotwFor(k.id)]).filter(([, s]) => s);
+  return `${head(`Grade ${esc(c.className)} · Term ${termOf()}`, 'Achievements')}
+    <div class="stack">
+      ${learnersHTML()}
+      ${win ? sotwCard(c, win) : ''}
+      <section class="card ach-summary">
+        <div><b data-count="${t.merits}">${t.merits}</b><small>Merits</small></div>
+        <div><b data-count="${t.demerits}" class="${t.demerits ? 'neg' : ''}">${t.demerits}</b><small>Demerits</small></div>
+        <div><b data-count="${earned}">${earned}</b><small>Badges</small></div>
+        ${nt ? `<div class="ach-next"><div class="ach-next-top"><span>${nt.at - t.merits} more to <b>${nt.label}</b></span><span class="row-meta">${t.merits}/${nt.at}</span></div>
+          <div class="progress" style="--c:var(--gold)"><i style="width:${Math.round(t.merits / nt.at * 100)}%"></i></div></div>` : ''}
+      </section>
+      ${t.unacked.length ? `<section class="card"><div class="card-head"><h2>Needs your acknowledgement</h2></div><div class="rows">${t.unacked.map(r => meritRow(r)).join('')}</div></section>` : ''}
+      ${t.demerits >= DEMERIT_MEETING_AT ? `<div class="status-line absent">${ICONS.alert} ${esc(c.first)} has ${t.demerits} demerits this term — ${esc(c.teacher)} would like to meet.</div>` : ''}
+      <div class="two-col stack">
+        <section class="card">
+          <div class="card-head"><h2>Badges</h2><span class="row-meta">${earned} of ${badges.length}</span></div>
+          <div class="badge-grid">${badges.map(b => `
+            <button class="badge-tile ${b.earned ? 'earned' : ''}" onclick="badgeSheet('${c.id}','${b.id}')">
+              ${medalHTML(b)}
+              <b>${esc(b.label)}</b>
+              ${b.earned ? `<small>${esc(b.sub)}</small>` : `<span class="progress mini-bar"><i style="width:${Math.round(Math.min(1, b.have / b.need) * 100)}%"></i></span><small>${b.have}/${b.need}</small>`}
+            </button>`).join('')}
+          </div>
+        </section>
+        <div class="stack">
+          <section class="card">
+            <div class="card-head"><h2>Recent</h2></div>
+            <div class="rows">${recs.slice(0, 8).map(r => meritRow(r)).join('') || '<div class="empty">Nothing yet this term.</div>'}</div>
+          </section>
+          <section class="card">
+            <div class="card-head"><h2>Students of the Week</h2><span class="row-meta">${weekLabel(THIS_WEEK)}</span></div>
+            <div class="rows">${wall.map(([k, s]) => {
+              const l = LEARNERS.find(x => x.id === s.learnerId);
+              return `<div class="row">${avatar(l.name, 'sm', 'var(--gold)')}<div class="grow"><div class="row-title">${esc(l.name)}</div><div class="row-sub">${esc(k.name)} · ${esc(s.reason)}</div></div></div>`;
+            }).join('') || '<div class="empty">Announced on Friday.</div>'}</div>
+          </section>
+        </div>
+      </div>
+    </div>`;
+}
+
+function meritSheet(id){
+  const r = allMerits().find(x => x.id === id), c = catOf(r.type, r.cat), merit = r.type === 'merit';
+  const kid = CHILDREN.find(k => k.learnerId === r.learnerId);
+  openSheet(`<div class="eyebrow">${merit ? 'Merit' : 'Demerit'} · ${esc(kid.first)}</div>
+    <h2>${esc(c.label)}</h2>
+    <div class="bankbox">
+      <div><span>Points</span><b class="pts ${merit ? 'plus' : 'minus'}">${merit ? '+' : '−'}${r.points}</b></div>
+      <div><span>From</span><b>${esc(r.by)}</b></div>
+      <div><span>Date</span><b>${fmtLong(r.date)}</b></div>
+      ${r.note ? `<div><span>Note</span><b>${esc(r.note)}</b></div>` : ''}
+    </div>
+    ${!merit ? (isAcked(r)
+      ? `<div class="status-line present">${ICONS.checkCircle} You acknowledged this demerit</div>`
+      : `<p class="lede">Please acknowledge that you've seen this. You can message ${esc(r.by)} if you'd like to discuss it.</p>
+         <button class="btn btn-navy btn-block" onclick="ackDemerit('${r.id}')">${ICONS.check} Acknowledge</button>
+         <a class="btn btn-line btn-block" style="margin-top:10px" href="#/messages" onclick="closeSheet()">${ICONS.chat} Message the teacher</a>`) : ''}`);
+}
+function ackDemerit(id){
+  const r = allMerits().find(x => x.id === id);
+  LIVE.ack(id);
+  closeSheet(); render();
+  toast(`${r.by} can see you've acknowledged it`, 'ok');
+}
+
+function badgeSheet(childId, badgeId){
+  const c = childById(childId), b = childBadges(c).find(x => x.id === badgeId);
+  openSheet(`<div class="badge-hero">${medalHTML(b, 'xl')}</div>
+    <div class="eyebrow" style="text-align:center">${b.earned ? 'Earned' : 'Locked'}</div>
+    <h2 style="text-align:center;margin:6px 0 8px">${esc(b.label)}</h2>
+    <p class="lede" style="text-align:center">${esc(b.sub)}${b.earned ? '' : ` · ${esc(c.first)} is on ${b.have} of ${b.need}`}</p>
+    ${b.earned ? '' : `<div class="progress" style="--c:var(--gold)"><i style="width:${Math.round(Math.min(1, b.have / b.need) * 100)}%"></i></div>`}`);
+}
+
+function certificateSheet(childId, sotwId){
+  const c = childById(childId), s = allSotw().find(x => x.id === sotwId);
+  openSheet(`<div class="certificate" id="certificate">
+      <img class="emblem" src="../assets/brand/emblem.png" alt="">
+      ${wordmark()}
+      <div class="cert-title">Student of the Week</div>
+      <div class="cert-sub">This certificate is proudly awarded to</div>
+      <div class="cert-name">${esc(c.name)}</div>
+      <div class="cert-sub">Grade ${esc(c.className)} · ${weekLabel(s.week)}</div>
+      <p class="cert-reason">“${esc(s.reason)}”</p>
+      <div class="cert-sign"><span>${esc(s.by)}</span><small>Class teacher</small></div>
+    </div>
+    <button class="btn btn-navy btn-block no-print" style="margin-top:16px" onclick="printCertificate()">${ICONS.download} Save or print</button>`);
+}
+function printCertificate(){
+  document.body.classList.add('print-cert');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-cert'), 500);
+}
+
+/* Celebrate new badges and Student of the Week the moment the school awards them */
+const seenKey = c => `wk_seen_badges_${c.id}`;
+function initCelebrations(){
+  CHILDREN.forEach(c => {
+    if(store(seenKey(c), null) === null) save(seenKey(c), childBadges(c).filter(b => b.earned).map(b => b.id));
+  });
+  if(store('wk_seen_sotw', null) === null) save('wk_seen_sotw', allSotw().map(s => s.id));
+}
+function celebrate(){
+  const seenSotw = store('wk_seen_sotw', []);
+  for(const c of CHILDREN){
+    const win = myWin(c);
+    if(win && !seenSotw.includes(win.id)){
+      save('wk_seen_sotw', [...seenSotw, win.id]);
+      save(seenKey(c), childBadges(c).filter(b => b.earned).map(b => b.id));
+      openSheet(`<div class="celebrate">${sotwCard(c, win)}</div>`);
+      confetti();
+      return;
+    }
+    const seen = store(seenKey(c), []);
+    const fresh = childBadges(c).filter(b => b.earned && !seen.includes(b.id));
+    if(fresh.length){
+      save(seenKey(c), [...seen, ...fresh.map(b => b.id)]);
+      const b = fresh[fresh.length - 1];
+      openSheet(`<div class="badge-hero">${medalHTML(b, 'xl new')}</div>
+        <div class="eyebrow" style="text-align:center">New badge unlocked</div>
+        <h2 style="text-align:center;margin:6px 0 8px">${esc(c.first)} earned ${esc(b.label)}!</h2>
+        <p class="lede" style="text-align:center">${esc(b.sub)}</p>
+        <a class="btn btn-navy btn-block" href="#/achievements" onclick="P.child='${c.id}'; save('wk_child','${c.id}'); closeSheet()">${ICONS.trophy} See all badges</a>`);
+      confetti();
+      return;
+    }
+  }
+}
+
 const ROUTES = {
-  tuckshop: screenTuckshop, collection: screenCollection,
+  achievements: screenAchievements, tuckshop: screenTuckshop, collection: screenCollection,
   home: screenHome, timetable: screenTimetable, diary: screenDiary, fees: screenFees,
   attendance: screenAttendance, notices: screenNotices, calendar: screenCalendar,
   gallery: screenGallery, album: screenAlbum, messages: screenMessages, profile: screenProfile,
 };
-const TITLES = { tuckshop: 'Tuck shop', collection: 'Collection', attendance: 'Attendance', notices: 'Notices', calendar: 'Calendar', gallery: 'Gallery', album: 'Gallery', messages: 'Messages', profile: 'Profile' };
+const TITLES = { achievements: 'Achievements', tuckshop: 'Tuck shop', collection: 'Collection', attendance: 'Attendance', notices: 'Notices', calendar: 'Calendar', gallery: 'Gallery', album: 'Gallery', messages: 'Messages', profile: 'Profile' };
 const PARENT_ROUTE = { album: 'gallery', messages: 'messages' };
 const TOP_LEVEL = ['home', 'diary', 'timetable', 'fees'];
-const MORE_ROUTES = ['tuckshop', 'collection', 'attendance', 'notices', 'calendar', 'gallery', 'album', 'messages', 'profile'];
+const MORE_ROUTES = ['achievements', 'tuckshop', 'collection', 'attendance', 'notices', 'calendar', 'gallery', 'album', 'messages', 'profile'];
 
 /* ---------------- Chrome ---------------- */
 function parseRoute(){
@@ -765,7 +966,7 @@ function renderSide(r){
   const counts = { notices: unreadNotices(), messages: unreadThreads(), fees: feesOverdue() ? '!' : 0 };
   const link = ([id, label, icon]) => `<a class="side-link ${active === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}${label}${counts[id] ? `<span class="count">${counts[id]}</span>` : ''}</a>`;
   const groups = [
-    ['Your children', [['home', 'Home', 'home'], ['timetable', 'Timetable', 'clock'], ['diary', 'Homework diary', 'book'], ['attendance', 'Attendance', 'register'], ['collection', 'Collection', 'car'], ['tuckshop', 'Tuck shop', 'pizza']]],
+    ['Your children', [['home', 'Home', 'home'], ['timetable', 'Timetable', 'clock'], ['diary', 'Homework diary', 'book'], ['attendance', 'Attendance', 'register'], ['achievements', 'Achievements', 'trophy'], ['collection', 'Collection', 'car'], ['tuckshop', 'Tuck shop', 'pizza']]],
     ['School', [['notices', 'Notices', 'megaphone'], ['calendar', 'Calendar', 'calendar'], ['gallery', 'Gallery', 'image'], ['messages', 'Messages', 'chat']]],
     ['Account', [['fees', 'Fees', 'wallet'], ['profile', 'Profile', 'user']]],
   ];
@@ -816,6 +1017,7 @@ function moreSheet(){
   const item = (id, label, icon, count) => `<a class="row" href="#/${id}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div>${count ? `<span class="count">${count}</span>` : ''}<span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>More</h2>
     <div class="card rows menu-list">
+      ${item('achievements', 'Achievements', 'trophy')}
       ${item('collection', 'Collection', 'car')}
       ${item('tuckshop', 'Tuck shop', 'pizza')}
       ${item('attendance', 'Attendance', 'register')}
@@ -1011,7 +1213,9 @@ document.addEventListener('touchend', e => {
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('hashchange', () => { closeSheet(); P.day = null; window.scrollTo(0, 0); render({ animate: true }); });
-window.addEventListener('storage', () => { announceLiveChanges(); render(); });
+window.addEventListener('storage', () => { announceLiveChanges(); render(); celebrate(); });
 DESKTOP.addEventListener('change', () => render());
 hydrateIcons();
+initCelebrations();
 render({ animate: true });
+celebrate();
