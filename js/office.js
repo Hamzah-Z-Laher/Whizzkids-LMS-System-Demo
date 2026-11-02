@@ -168,8 +168,9 @@ function screenNotices(){
 function screenLearners(){
   const q = S.q.toLowerCase();
   const rows = LEARNERS.filter(l => (S.classFilter === 'all' || l.classId === S.classFilter) && (!q || l.name.toLowerCase().includes(q) || l.parent.toLowerCase().includes(q)));
-  return `${head('Records', 'Learners', `${LEARNERS.length} learners in the sample roster`)}
+  return `${head('Records', 'Learners', `${LEARNERS.length} learners`)}
     <div class="stack">
+      <button class="btn btn-navy start-btn" onclick="addLearnerSheet()">${ICONS.plus} Add a learner</button>
       <label class="search">${ICONS.search}<input id="q" placeholder="Search learner or parent" value="${esc(S.q)}" oninput="S.q=this.value; renderView(); const i=$('#q'); i.focus(); i.setSelectionRange(i.value.length,i.value.length);"></label>
       <div class="filters">${[['all', 'All classes'], ...CLASSES.map(c => [c.id, c.name])].map(([id, label]) => `<button class="chip ${S.classFilter === id ? 'on' : ''}" onclick="S.classFilter='${id}'; render();">${esc(label)}</button>`).join('')}</div>
       <section class="card">
@@ -178,7 +179,7 @@ function screenLearners(){
           <tbody>${rows.map(l => {
             const f = learnerFee(l);
             return `<tr onclick="learnerSheet('${l.id}')">
-              <td><span class="who">${avatar(l.name, 'sm')}${esc(l.name)}</span></td>
+              <td><span class="who">${avatar(l.name, 'sm')}${esc(l.name)}${l.added ? ' <span class="ribbon">New</span>' : ''}</span></td>
               <td class="m-sub">${esc(classById(l.classId).name)}<span class="m-only"> · ${l.attendance}%</span></td>
               <td class="m-hide">${esc(l.parent)}</td>
               <td class="m-hide"><span class="progress mini" style="--c:${l.attendance >= 93 ? 'var(--ok)' : l.attendance >= 88 ? 'var(--warn)' : 'var(--blazer)'}"><i style="width:${l.attendance}%"></i></span>${l.attendance}%</td>
@@ -206,15 +207,20 @@ function screenFees(){
       </div>
       <div class="filters">${[['all', 'All'], ['overdue', 'Overdue'], ['partial', 'Partial'], ['paid', 'Paid']].map(([id, label]) => `<button class="chip ${S.feeFilter === id ? 'on' : ''}" onclick="S.feeFilter='${id}'; render();">${label}</button>`).join('')}</div>
       <section class="card">
-        <table class="data">
+        <div class="bulk-bar">
+          <button class="btn btn-sm btn-line" onclick="selectOverdue()">${ICONS.check} Select all overdue</button>
+          <span class="row-meta">${S.feeSel.length ? S.feeSel.length + ' selected' : 'Tick families to remind'}</span>
+          <button class="btn btn-sm btn-red" ${S.feeSel.length ? '' : 'disabled'} onclick="bulkRemind()">${ICONS.send} Send reminder${S.feeSel.length > 1 ? 's' : ''}${S.feeSel.length ? ' (' + S.feeSel.length + ')' : ''}</button>
+        </div>
+        <table class="data has-pick">
           <thead><tr><th>Learner</th><th>Parent</th><th>Status</th><th style="text-align:right">Balance</th><th></th></tr></thead>
           <tbody>${rows.map(l => `
-            <tr onclick="learnerSheet('${l.id}')">
-              <td><span class="who">${avatar(l.name, 'sm')}${esc(l.name)}</span></td>
+            <tr onclick="learnerSheet('${l.id}')" class="${S.feeSel.includes(l.id) ? 'sel' : ''}">
+              <td><span class="who">${l.fee.balance > 0 && !reminded[l.id] ? `<input type="checkbox" class="pick-box" aria-label="Select ${esc(l.name)}" ${S.feeSel.includes(l.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleFeeSel('${l.id}', this.checked)">` : '<span class="pick-gap"></span>'}${avatar(l.name, 'sm')}${esc(l.name)}</span></td>
               <td class="m-sub">${esc(l.parent)}</td>
               <td class="m-hide">${feePill(l.fee.status)}</td>
               <td class="num">${fmtMoney(l.fee.balance)}</td>
-              <td class="m-hide" style="text-align:right">${l.fee.status !== 'paid' ? (reminded[l.id] ? '<span class="row-meta">Reminded</span>' : `<button class="btn btn-line btn-sm" onclick="event.stopPropagation(); remind('${l.id}')">Remind</button>`) : ''}</td>
+              <td class="m-hide" style="text-align:right">${l.fee.status !== 'paid' ? (reminded[l.id] ? `<span class="pill pill-sky">${ICONS.check} Reminded</span>` : `<button class="btn btn-line btn-sm" onclick="event.stopPropagation(); remind('${l.id}')">Remind</button>`) : ''}</td>
             </tr>`).join('')}</tbody>
         </table>
       </section>
@@ -385,8 +391,164 @@ function allReady(){
   toast('All orders marked ready', 'ok');
 }
 
-const ROUTES = { collection: screenCollection, tuckshop: screenTuckshop, overview: screenOverview, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
-const TITLES = { fees: 'Fees', calendar: 'Calendar & gallery', notices: 'Notices', learners: 'Learners' };
+/* ---------------- Staff & HODs ---------------- */
+function screenStaff(){
+  const hods = getHods();
+  const phaseCard = p => {
+    const h = hodOfPhase(p.id), team = teachersInPhase(p.id);
+    return `<section class="card card-pad hod-card">
+      <div class="eyebrow">${p.grades}</div>
+      <h2 style="font-size:18px;margin:4px 0 12px">${p.name}</h2>
+      <div class="hod-who">${h ? `${avatar(h.name, 'md', 'var(--gold)')}<div class="grow"><div class="row-title">${esc(h.short)}</div><div class="row-sub">Head of Department</div></div>` : `<span class="food" style="--c:var(--ink-3)">${ICONS.shield}</span><div class="grow"><div class="row-title">No HOD yet</div><div class="row-sub">Papers go to the Deputy Principal</div></div>`}</div>
+      <div class="hod-team">${team.map(t => `<span class="team-chip ${h && t.id === h.id ? 'is-hod' : ''}">${avatar(t.name, 'sm')}${esc(t.short)}</span>`).join('') || '<span class="row-meta">No teachers in this phase</span>'}</div>
+      <div class="hod-actions">
+        <button class="btn btn-sm btn-navy" onclick="hodSheet('${p.id}')" ${team.length ? '' : 'disabled'}>${ICONS.shield} ${h ? 'Change HOD' : 'Appoint HOD'}</button>
+        ${h ? `<button class="btn btn-sm btn-line" style="color:var(--blazer)" onclick="removeHod('${p.id}')">Remove</button>` : ''}
+      </div>
+    </section>`;
+  };
+  return `${head('Records', 'Staff', 'Teachers, their classes and Heads of Department.')}
+    <div class="stack">
+      <button class="btn btn-navy start-btn" onclick="addTeacherSheet()">${ICONS.plus} Add a teacher</button>
+      <div class="eyebrow section-label" style="padding-top:4px">Heads of Department</div>
+      <div class="hod-grid">${PHASE_LIST.map(phaseCard).join('')}</div>
+      <div class="eyebrow section-label">All teachers · ${STAFF.length}</div>
+      <section class="card">
+        <table class="data">
+          <thead><tr><th>Teacher</th><th>Role</th><th>Phase</th><th></th></tr></thead>
+          <tbody>${STAFF.map(t => {
+            const hp = hodPhaseOf(t.id);
+            return `<tr onclick="staffSheet('${t.id}')">
+              <td><span class="who">${avatar(t.name, 'sm', hp ? 'var(--gold)' : undefined)}${esc(t.title)} ${esc(t.name)}${t.added ? ' <span class="ribbon">New</span>' : ''}</span></td>
+              <td class="m-sub">${esc(staffRole(t))}</td>
+              <td class="m-hide">${esc(phaseById(t.phase).name)}</td>
+              <td class="m-right">${hp ? '<span class="pill pill-navy">HOD</span>' : ''}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </section>
+    </div>`;
+}
+function staffSheet(id){
+  const t = staffById(id), hp = hodPhaseOf(id), ph = phaseById(t.phase);
+  openSheet(`<div style="display:flex;align-items:center;gap:14px;margin:6px 44px 16px 0">${avatar(t.name, 'lg', hp ? 'var(--gold)' : undefined)}<div><h2 style="margin:0">${esc(t.title)} ${esc(t.name)}</h2><p class="muted">${esc(staffRole(t))}</p></div></div>
+    <div class="bankbox">
+      <div><span>Phase</span><b>${esc(ph.name)}</b></div>
+      <div><span>Subjects</span><b>${esc(t.subjects.join(', '))}</b></div>
+      <div><span>Email</span><b>${esc(t.email)}</b></div>
+      ${t.phone ? `<div><span>Phone</span><b>${esc(t.phone)}</b></div>` : ''}
+      <div><span>Role</span><b>${hp ? `HOD · ${esc(phaseById(hp).name)}` : 'Teacher'}</b></div>
+    </div>
+    ${hp ? `<button class="btn btn-line btn-block" style="color:var(--blazer)" onclick="removeHod('${hp}')">Remove as HOD</button>`
+      : `<button class="btn btn-navy btn-block" onclick="appointHod('${ph.id}', '${t.id}')">${ICONS.shield} Make HOD of ${esc(ph.name)}</button>`}`);
+}
+function hodSheet(phaseId){
+  const p = phaseById(phaseId), cur = getHods()[phaseId], team = teachersInPhase(phaseId);
+  openSheet(`<div class="eyebrow">${p.grades}</div><h2>HOD for ${p.name}</h2>
+    <p class="lede">They'll check papers and do observations for the other teachers in this phase.</p>
+    <div class="choices">${team.map((t, i) => `<label class="choice"><input type="radio" name="hod" value="${t.id}" ${(cur ? t.id === cur : i === 0) ? 'checked' : ''}>${avatar(t.name, 'sm')}<span class="grow"><b>${esc(t.short)}</b><small>${esc(staffRole(t))}</small></span><span class="radio"></span></label>`).join('')}</div>
+    <button class="btn btn-navy btn-block" onclick="appointHod('${phaseId}', document.querySelector('input[name=hod]:checked').value)">${ICONS.check} Save</button>`);
+}
+function appointHod(phaseId, staffId){
+  const h = { ...getHods() };
+  Object.keys(h).forEach(k => { if(h[k] === staffId) h[k] = null; });
+  h[phaseId] = staffId;
+  save('wk_hods', h);
+  closeSheet(); render();
+  const t = staffById(staffId), others = teachersInPhase(phaseId).length - 1;
+  toast(`${t.short} is now HOD of ${phaseById(phaseId).name} for ${others} teacher${others === 1 ? '' : 's'}`, 'ok');
+}
+function removeHod(phaseId){
+  const h = { ...getHods() }, t = staffById(h[phaseId]);
+  h[phaseId] = null; save('wk_hods', h);
+  closeSheet(); render();
+  toast(`${t.short} is no longer HOD of ${phaseById(phaseId).name}`);
+}
+function addTeacherSheet(){
+  openSheet(`<div class="eyebrow">Staff</div><h2>Add a teacher</h2>
+    <div class="two-field">
+      <label class="field"><span>Title</span><select id="nt-title"><option>Mr</option><option>Mrs</option><option>Ms</option><option>Dr</option></select></label>
+      <label class="field"><span>First name</span><input id="nt-first" placeholder="e.g. Daniel"></label>
+    </div>
+    <label class="field"><span>Surname</span><input id="nt-last" placeholder="e.g. Ricciardo"></label>
+    <div class="two-field">
+      <label class="field"><span>Email</span><input id="nt-email" type="email" placeholder="name@whizzkid.co.za"></label>
+      <label class="field"><span>Cellphone</span><input id="nt-phone" type="tel" placeholder="08x xxx xxxx"></label>
+    </div>
+    <label class="field"><span>Phase</span><select id="nt-phase">${PHASE_LIST.map(p => `<option value="${p.id}" ${p.id === 'intermediate' ? 'selected' : ''}>${p.name} · ${p.grades}</option>`).join('')}</select></label>
+    <label class="field"><span>Subjects</span><input id="nt-subjects" value="Mathematics, English"></label>
+    <label class="check-row"><input type="checkbox" id="nt-hod"> Make them HOD of this phase</label>
+    <button class="btn btn-navy btn-block" onclick="addTeacher()">${ICONS.plus} Add teacher</button>`);
+}
+function addTeacher(){
+  const first = $('#nt-first').value.trim(), last = $('#nt-last').value.trim();
+  if(!first || !last){ toast('Add a first name and surname', 'bad'); return; }
+  const t = mkStaff('t-' + Date.now(), $('#nt-title').value, first, last, null,
+    $('#nt-subjects').value.split(',').map(s => s.trim()).filter(Boolean), $('#nt-phase').value);
+  if($('#nt-email').value.trim()) t.email = $('#nt-email').value.trim();
+  t.phone = $('#nt-phone').value.trim();
+  save('wk_new_staff', [...store('wk_new_staff', []), t]);
+  syncDirectory();
+  if($('#nt-hod').checked){ appointHod(t.phase, t.id); }
+  else { closeSheet(); render(); }
+  toast(`${t.short} added to ${phaseById(t.phase).name}`, 'ok');
+}
+
+/* ---------------- Add learner ---------------- */
+function addLearnerSheet(){
+  openSheet(`<div class="eyebrow">Learners</div><h2>Add a learner</h2>
+    <div class="two-field">
+      <label class="field"><span>First name</span><input id="nl-first" placeholder="e.g. Oscar"></label>
+      <label class="field"><span>Surname</span><input id="nl-last" placeholder="e.g. Piastri"></label>
+    </div>
+    <div class="two-field">
+      <label class="field"><span>Class</span><select id="nl-class">${CLASSES.map(c => `<option value="${c.id}" ${c.id === 'c4' ? 'selected' : ''}>${esc(c.name)} · ${esc(c.teacher)}</option>`).join('')}</select></label>
+      <label class="field"><span>Date of birth</span><input id="nl-dob" type="date" value="${new Date().getFullYear() - 11}-03-14"></label>
+    </div>
+    <div class="eyebrow" style="color:var(--ink-3);margin:6px 0 10px">Parent or guardian</div>
+    <label class="field"><span>Full name</span><input id="nl-parent" placeholder="e.g. Chris Piastri"></label>
+    <div class="two-field">
+      <label class="field"><span>Email</span><input id="nl-email" type="email" placeholder="parent@email.com"></label>
+      <label class="field"><span>Cellphone</span><input id="nl-phone" type="tel" placeholder="08x xxx xxxx"></label>
+    </div>
+    <label class="field"><span>Allergies or medical notes (optional)</span><textarea id="nl-medical" placeholder="e.g. Peanut allergy — EpiPen in bag"></textarea></label>
+    <button class="btn btn-navy btn-block" onclick="addLearner()">${ICONS.plus} Add learner</button>`);
+}
+function addLearner(){
+  const first = $('#nl-first').value.trim(), last = $('#nl-last').value.trim(), parent = $('#nl-parent').value.trim();
+  if(!first || !last){ toast('Add the learner\'s first name and surname', 'bad'); return; }
+  if(!parent){ toast('Add a parent or guardian', 'bad'); return; }
+  const l = { id: 'ln-' + Date.now(), name: `${first} ${last}`, classId: $('#nl-class').value, parent, attendance: 100, feeStatus: 'paid', balance: 0,
+    dob: $('#nl-dob').value, parentEmail: $('#nl-email').value.trim(), parentPhone: $('#nl-phone').value.trim(), medical: $('#nl-medical').value.trim() };
+  save('wk_new_learners', [...store('wk_new_learners', []), l]);
+  syncDirectory();
+  closeSheet(); render();
+  const c = classById(l.classId);
+  toast(`${l.name} added to ${c.name} — ${c.teacher} sees them in the register now`, 'ok');
+}
+
+/* ---------------- Bulk fee reminders ---------------- */
+S.feeSel = [];
+function toggleFeeSel(id, on){ S.feeSel = on ? [...new Set([...S.feeSel, id])] : S.feeSel.filter(x => x !== id); renderView(); }
+function selectOverdue(){
+  const reminded = store('wk_reminded', {});
+  const ids = LEARNERS.filter(l => learnerFee(l).status === 'overdue' && !reminded[l.id]).map(l => l.id);
+  S.feeSel = ids.every(id => S.feeSel.includes(id)) ? [] : ids;
+  renderView();
+}
+function bulkRemind(){
+  if(!S.feeSel.length) return;
+  const r = store('wk_reminded', {});
+  S.feeSel.forEach(id => { r[id] = TODAY_ISO; });
+  save('wk_reminded', r);
+  const n = S.feeSel.length;
+  S.feeSel = [];
+  render();
+  toast(`Reminders sent to ${n} famil${n === 1 ? 'y' : 'ies'} — by app notification and email`, 'ok');
+}
+
+const ROUTES = { staff: screenStaff, collection: screenCollection, tuckshop: screenTuckshop, overview: screenOverview, notices: screenNotices, learners: screenLearners, fees: screenFees, calendar: screenCalendar };
+const TITLES = { staff: 'Staff', fees: 'Fees', calendar: 'Calendar & gallery', notices: 'Notices', learners: 'Learners' };
 const TOP_LEVEL = ['overview', 'collection', 'tuckshop', 'fees'];
 
 /* ---------------- Chrome ---------------- */
@@ -409,7 +571,7 @@ function renderSide(r){
   const groups = [
     ['Today', [['overview', 'Overview', 'grid', inboxCount], ['collection', 'Collection', 'car', gateCount()], ['tuckshop', 'Tuck shop', 'pizza']]],
     ['Communication', [['notices', 'Notices', 'megaphone'], ['calendar', 'Calendar & gallery', 'calendar']]],
-    ['Records', [['learners', 'Learners', 'users'], ['fees', 'Fees', 'coins']]],
+    ['Records', [['learners', 'Learners', 'users'], ['staff', 'Staff', 'shield'], ['fees', 'Fees', 'coins']]],
   ];
   return `<img class="emblem" src="../assets/brand/emblem.png" alt="Whizzkidz Academy crest">
     ${wordmark('light')}
@@ -424,7 +586,7 @@ function renderTabs(r){
   const inboxCount = LIVE.absences().filter(a => a.date === TODAY_ISO).length;
   const tabs = [['overview', 'Overview', 'grid'], ['collection', 'Pick-up', 'car'], ['tuckshop', 'Tuck shop', 'pizza'], ['fees', 'Fees', 'coins']];
   return tabs.map(([id, label, icon]) => `<a class="tab ${r.name === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}<span>${label}</span>${id === 'overview' && inboxCount ? `<span class="count">${inboxCount}</span>` : ''}</a>`).join('')
-    + `<button class="tab ${['calendar', 'notices', 'learners'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
+    + `<button class="tab ${['calendar', 'notices', 'learners', 'staff'].includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span></button>`;
 }
 function renderView(){ $('#view').innerHTML = ROUTES[parseRoute().name](); if(parseRoute().name === 'notices') preview(); }
 function render(opts = {}){
@@ -444,6 +606,7 @@ function moreSheet(){
     <div class="card rows menu-list">
       ${item('#/notices', 'Notices', 'megaphone')}
       ${item('#/learners', 'Learners', 'users')}
+      ${item('#/staff', 'Staff & HODs', 'shield')}
       ${item('#/calendar', 'Calendar & gallery', 'calendar')}
       <button class="row" onclick="resetDemoSheet()"><span class="ic">${ICONS.refresh}</span><div class="grow"><div class="row-title">Reset demo data</div><div class="row-sub">Restore the original sample data</div></div></button>
       <button class="row" onclick="signOut()"><span class="ic">${ICONS.logout}</span><div class="grow"><div class="row-title">Sign out</div></div></button>

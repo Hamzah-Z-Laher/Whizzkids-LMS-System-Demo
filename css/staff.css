@@ -103,3 +103,20 @@
   .kpi b{ font-size: 32px; }
   .compose-grid{ display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 }
+
+/* Staff & HODs, bulk reminders */
+.hod-grid{ display: grid; gap: 14px; }
+.hod-who{ display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255,255,255,.7); border: 1px solid var(--glass-edge); }
+.hod-who .grow{ flex: 1; min-width: 0; }
+.hod-team{ display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.team-chip{ display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--ink-2); background: rgba(30,18,112,.05); }
+.team-chip .avatar{ width: 24px; height: 24px; font-size: 10px; }
+.team-chip.is-hod{ background: var(--gold-soft); color: #8A5E00; }
+.hod-actions{ display: flex; gap: 8px; flex-wrap: wrap; }
+.bulk-bar{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px 10px; border-bottom: 1px solid var(--line-2); }
+.bulk-bar .row-meta{ flex: 1; min-width: 100px; }
+.pick-box{ width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blazer); cursor: pointer; }
+.pick-gap{ width: 20px; flex-shrink: 0; }
+.data tr.sel td{ background: rgba(211,40,62,.05); }
+@media (max-width: 959px){ .data.has-pick td.m-sub{ padding-left: 72px; } }
+@media (min-width: 960px){ .hod-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }

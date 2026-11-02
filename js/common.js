@@ -275,6 +275,39 @@ function placeTabGlow(bar){
   lastTabPos = to;
 }
 
+/* ---------------- Tiny one-page PDF writer (demo documents) ---------------- */
+function makePdf(ops){
+  const WIN = { '–': 150, '—': 151, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '·': 183, '×': 215 };
+  const enc = s => [...String(s)].map(ch => { const c = ch.codePointAt(0); return c < 128 ? ch : String.fromCharCode(WIN[ch] || (c < 256 ? c : 63)); }).join('');
+  const lit = s => enc(s).replace(/[\\()]/g, '\\/* ---------------- Push-style notification (portals) ---------------- */');
+  const content = ops.map(o => o.line
+    ? `${o.w || 1} w ${o.line[0]} ${o.line[1]} m ${o.line[2]} ${o.line[3]} l S`
+    : `BT /${o.bold ? 'F2' : 'F1'} ${o.size || 11} Tf ${o.x} ${o.y} Td (${lit(o.t)}) Tj ET`).join('\n');
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = objs.map((o, i) => { const at = out.length; out += `${i + 1} 0 obj\n${o}\nendobj\n`; return at; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}`;
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const bytes = new Uint8Array(out.length);
+  for(let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 /* ---------------- Push-style notification (portals) ---------------- */
 let pushNoteTimer = null;
 function pushNote(title, body, tone = 'ok', href = null){
@@ -283,7 +316,7 @@ function pushNote(title, body, tone = 'ok', href = null){
   el.className = `push ${tone === 'bad' ? 'demerit' : ''}`;
   el.setAttribute('role', 'status');
   el.innerHTML = `<img src="../assets/brand/emblem.png" alt=""><span class="grow"><span class="push-top"><b>Whizzkidz</b><span>now</span></span><span class="push-title">${esc(title)}</span><span class="push-body">${esc(body)}</span></span>`;
-  const hide = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 400); };
+  const hide = () => { if(!el.isConnected) return; el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 400); };
   el.onclick = () => { hide(); if(href) location.hash = href; };
   let y0 = null;
   el.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });

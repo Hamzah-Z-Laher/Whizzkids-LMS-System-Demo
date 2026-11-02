@@ -79,7 +79,7 @@ function attentionItems(){
     if(t.demerits >= DEMERIT_MEETING_AT) items.push({ urgent: true, icon: 'users', title: `${c.first} has ${t.demerits} demerits this term`, sub: `${c.teacher} would like to meet`, action: 'Book', run: `toast('Meeting request sent to ${c.teacher}', 'ok')` });
   });
   if(feesOverdue()){
-    items.push({ urgent: true, icon: 'wallet', title: `${fmtMoney(balance())} in fees is overdue`, sub: `Was due ${fmtShort(FAMILY_ACCOUNT.dueDate)} · account ${FAMILY_ACCOUNT.number}`, action: 'Pay', run: 'paySheet()' });
+    items.push({ urgent: true, icon: 'wallet', title: `${fmtMoney(balance())} in fees is overdue`, sub: store('wk_reminded', {})[CHILDREN[1].learnerId] ? `Reminder from the office · was due ${fmtShort(FAMILY_ACCOUNT.dueDate)}` : `Was due ${fmtShort(FAMILY_ACCOUNT.dueDate)} · account ${FAMILY_ACCOUNT.number}`, action: 'Pay', run: 'paySheet()' });
   }
   return items.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
 }
@@ -719,8 +719,9 @@ function arrivedAll(){
 }
 
 /* Toast when the school updates something in another tab or device view */
-let seen = { gate: {}, tuck: {}, merits: [] };
-function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() }, merits: LIVE.merits().map(r => r.id) }; }
+let seen = { gate: {}, tuck: {}, merits: [], reminded: false };
+const familyReminded = () => !!store('wk_reminded', {})[CHILDREN[1].learnerId];
+function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() }, merits: LIVE.merits().map(r => r.id), reminded: familyReminded() }; }
 function announceLiveChanges(){
   const gate = LIVE.gate(SCHOOL_TODAY), tuck = LIVE.tuckStatus();
   CHILDREN.forEach(c => {
@@ -728,6 +729,7 @@ function announceLiveChanges(){
     if(g && g.status === 'collected' && !seen.gate[c.learnerId]) toast(`${c.first} was collected at ${g.at} by ${g.by}`, 'ok');
   });
   meritBanner();
+  if(familyReminded() && !seen.reminded && balance() > 0) pushNote('Fee reminder from the office', `${fmtMoney(balance())} is overdue on account ${FAMILY_ACCOUNT.number}. Tap to pay.`, 'bad', '#/fees');
   myOrders().forEach(o => {
     if(tuck[o.id] && tuck[o.id] !== seen.tuck[o.id]){
       toast(tuck[o.id] === 'ready' ? `${childById(o.childId).first}'s tuck shop order is ready` : `${childById(o.childId).first} has collected their tuck shop order`, 'ok');
@@ -951,18 +953,17 @@ function meritBanner(){
   el.className = `push ${one && one.type === 'demerit' ? 'demerit' : ''}`;
   el.setAttribute('role', 'status');
   el.innerHTML = `<img src="../assets/brand/emblem.png" alt=""><span class="grow"><span class="push-top"><b>Whizzkidz</b><span>now</span></span><span class="push-title">${esc(title)}</span><span class="push-body">${esc(body)}</span></span>`;
-  el.onclick = () => { hidePush(); if(one) meritSheet(one.id); else location.hash = '#/achievements'; };
+  el.onclick = () => { hidePush(el); if(one) meritSheet(one.id); else location.hash = '#/achievements'; };
   let y0 = null;
   el.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
-  el.addEventListener('touchmove', e => { if(y0 !== null && e.touches[0].clientY - y0 < -24){ y0 = null; hidePush(); } }, { passive: true });
+  el.addEventListener('touchmove', e => { if(y0 !== null && e.touches[0].clientY - y0 < -24){ y0 = null; hidePush(el); } }, { passive: true });
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(hidePush, 6500);
+  pushTimer = setTimeout(() => hidePush(el), 6500);
 }
-function hidePush(){
-  const el = document.querySelector('.push');
-  if(!el) return;
+function hidePush(el = document.querySelector('.push')){
+  if(!el || !el.isConnected) return;
   el.classList.remove('in'); el.classList.add('out');
   setTimeout(() => el.remove(), 400);
 }
