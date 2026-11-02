@@ -238,3 +238,12 @@
 
 .new-merits{ border-color: color-mix(in srgb, var(--ok) 25%, white); box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 12px 32px -14px rgba(31,138,76,.35); }
 .new-merits .card-head h2::before{ content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); margin-right: 9px; vertical-align: 2px; box-shadow: 0 0 0 4px var(--ok-soft); }
+
+/* ---------- Class notices ---------- */
+.cn-row{ align-items: flex-start; }
+.cn-stat{ display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-3); }
+.cn-stat .progress{ flex: 1; max-width: 160px; height: 6px; }
+.clip{ display: inline-flex; vertical-align: -3px; color: var(--ink-3); }
+.clip .icon{ width: 15px; height: 15px; }
+.clip-tag{ display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--warn); }
+.clip-tag .icon{ width: 13px; height: 13px; }

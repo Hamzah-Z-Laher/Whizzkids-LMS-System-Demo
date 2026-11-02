@@ -145,6 +145,10 @@ const LIVE = {
   acks: () => store('wk_acks', {}),
   ack: id => { const m = LIVE.acks(); m[id] = new Date().toISOString(); save('wk_acks', m); },
   sotw: () => store('wk_sotw', []),
+  classNotices: () => store('wk_class_notices', []),
+  addClassNotice: n => save('wk_class_notices', [n, ...LIVE.classNotices()]),
+  cnAcks: () => store('wk_cn_acks', {}),
+  ackClassNotice: id => { const m = LIVE.cnAcks(); m[id] = new Date().toISOString(); save('wk_cn_acks', m); },
   addSotw: s => save('wk_sotw', [s, ...LIVE.sotw().filter(x => !(x.week === s.week && x.classId === s.classId))]),
   tuckOrders: () => store('wk_tuck_orders', []),
   setTuckOrders: l => save('wk_tuck_orders', l),
@@ -279,7 +283,7 @@ function placeTabGlow(bar){
 function makePdf(ops){
   const WIN = { '–': 150, '—': 151, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '·': 183, '×': 215 };
   const enc = s => [...String(s)].map(ch => { const c = ch.codePointAt(0); return c < 128 ? ch : String.fromCharCode(WIN[ch] || (c < 256 ? c : 63)); }).join('');
-  const lit = s => enc(s).replace(/[\\()]/g, '\\/* ---------------- Push-style notification (portals) ---------------- */');
+  const lit = s => enc(s).replace(/[\\()]/g, ch => '\\' + ch);
   const content = ops.map(o => o.line
     ? `${o.w || 1} w ${o.line[0]} ${o.line[1]} m ${o.line[2]} ${o.line[3]} l S`
     : `BT /${o.bold ? 'F2' : 'F1'} ${o.size || 11} Tf ${o.x} ${o.y} Td (${lit(o.t)}) Tj ET`).join('\n');
@@ -306,6 +310,46 @@ function downloadBlob(blob, name){
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* ---------------- Class notices: shared ---------------- */
+const allClassNotices = () => [...LIVE.classNotices(), ...CLASS_NOTICE_SEED].sort((a, b) => (b.at || b.date).localeCompare(a.at || a.date));
+function examDates(count, start = EXAMS_START){
+  const out = [], d = parseISO(start);
+  while(out.length < count){ if(!isWeekend(d)) out.push(isoOf(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+function examTimetablePdf(className, start = EXAMS_START){
+  const ops = [], text = (t, x, y, size = 11, bold = false) => ops.push({ t, x, y, size, bold });
+  text('WHIZZKIDZ ACADEMY', 50, 790, 17, true);
+  text(`${className} · Term ${termOf()} exam timetable · ${new Date().getFullYear()}`, 50, 770, 11);
+  ops.push({ line: [50, 758, 545, 758], w: 1.5 });
+  text('Date', 50, 734, 11, true); text('Subject', 210, 734, 11, true); text('Time', 445, 734, 11, true);
+  let y = 734;
+  const dates = examDates(EXAM_SUBJECTS.length, start);
+  EXAM_SUBJECTS.forEach((s, i) => {
+    y -= 30;
+    ops.push({ line: [50, y + 20, 545, y + 20], w: .4 });
+    text(fmtLong(dates[i]), 50, y, 10);
+    text(s, 210, y, 11);
+    text(i % 2 ? '10:30 – 12:00' : '08:00 – 10:00', 445, y, 10);
+  });
+  y -= 46;
+  text('Learners must arrive by 07:30 with two pens, a pencil, an eraser and a calculator.', 50, y, 10);
+  text('Normal classes continue on days without an exam.', 50, y - 16, 10);
+  text('Demo document · Whizzkidz Connect prototype', 50, 40, 8);
+  return makePdf(ops);
+}
+const downloadNoticeFile = id => downloadAttachment(allClassNotices().find(n => n.id === id));
+function downloadAttachment(n){
+  const a = n.attachment;
+  if(!a) return;
+  if(a.kind === 'timetable'){ downloadBlob(examTimetablePdf(a.className, a.start), a.name); return; }
+  if(a.dataUrl){
+    const [h, b] = a.dataUrl.split(','), bin = atob(b), arr = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    downloadBlob(new Blob([arr], { type: h.match(/:(.*?);/)[1] }), a.name);
+  } else toast('That file was too big to keep in the demo');
 }
 
 /* ---------------- Push-style notification (portals) ---------------- */

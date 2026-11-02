@@ -492,3 +492,10 @@ const OBS_SEED = [
     feedback: { ratings: { plan: 3, engage: 2, check: 3, manage: 3 }, strengths: 'Clear lesson goals and great hands-on demonstrations.', growth: 'Give learners a bit more time to think before taking answers.', at: dayOffset(-40) },
     reflection: 'I will use think-pair-share to give everyone time to think.' },
 ];
+
+/* ---------------- Class notices (teacher → parents of one class) ---------------- */
+const CLASS_NOTICE_SEED = [
+  { id: 'cn-1', classId: 'c4', by: 'Mr Rosberg', title: 'Maths test on Friday', body: 'Grade 6A writes a Maths test on fractions and decimals this Friday. Please help your child revise from their workbook.', date: dayOffset(-3), at: dayOffset(-3), seen: 7, acked: 0 },
+  { id: 'cn-2', classId: 'c3', by: 'Mr Coulthard', title: 'Library books due back', body: 'Please send library books back to school by Thursday so we can swap them for new ones.', date: dayOffset(-2), at: dayOffset(-2), ack: true, seen: 7, acked: 6 },
+];
+const EXAM_SUBJECTS = ['Mathematics Paper 1', 'English Home Language', 'Afrikaans First Additional Language', 'Natural Sciences', 'Social Sciences', 'Mathematics Paper 2', 'Technology', 'Life Skills'];

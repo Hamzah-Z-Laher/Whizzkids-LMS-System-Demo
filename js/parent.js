@@ -17,8 +17,15 @@ const findHw = id => Object.values(HOMEWORK).flat().find(h => h.id === id);
 const hwChild = id => CHILDREN.find(c => HOMEWORK[c.id].some(h => h.id === id));
 function isDone(h){ const m = hwDoneMap(); return h.id in m ? m[h.id] : !!h.done; }
 
-function allNotices(){ return [...LIVE.notices().map(n => ({ ...n, live: true })), ...NOTICES]; }
-const readNotices = () => store('wk_read_notices', NOTICES.filter(n => daysFromToday(n.date) < -2).map(n => n.id));
+function classNoticesForMe(){
+  return allClassNotices().filter(n => CHILDREN.some(c => c.classId === n.classId)).map(n => {
+    const kid = CHILDREN.find(c => c.classId === n.classId);
+    return { ...n, audience: `Grade ${kid.className} · ${n.by}`, priority: n.ack ? 'high' : 'normal', classNotice: true, kid };
+  });
+}
+function allNotices(){ return [...LIVE.notices().map(n => ({ ...n, live: true })), ...classNoticesForMe(), ...NOTICES].sort((a, b) => (b.at || b.date).localeCompare(a.at || a.date)); }
+const needsAck = n => n.classNotice && n.ack && !LIVE.cnAcks()[n.id];
+const readNotices = () => store('wk_read_notices', [...NOTICES, ...CLASS_NOTICE_SEED].filter(n => daysFromToday(n.date) < -2).map(n => n.id));
 const isNoticeUnread = n => !readNotices().includes(n.id);
 function markNoticeRead(id){ const r = readNotices(); if(!r.includes(id)){ r.push(id); save('wk_read_notices', r); } }
 const unreadNotices = () => allNotices().filter(isNoticeUnread).length;
@@ -78,6 +85,7 @@ function attentionItems(){
     t.unacked.forEach(r => items.push({ icon: 'alert', title: `Demerit: ${catOf('demerit', r.cat).label}`, sub: `${c.first} · ${r.by} · ${relAgo(r.date)}`, action: 'View', run: `meritSheet('${r.id}')` }));
     if(t.demerits >= DEMERIT_MEETING_AT) items.push({ urgent: true, icon: 'users', title: `${c.first} has ${t.demerits} demerits this term`, sub: `${c.teacher} would like to meet`, action: 'Book', run: `toast('Meeting request sent to ${c.teacher}', 'ok')` });
   });
+  allNotices().filter(needsAck).forEach(n => items.push({ urgent: !!n.due && daysFromToday(n.due) <= 1, icon: 'megaphone', title: `Please confirm: ${n.title}`, sub: `${n.kid.first} · ${n.by}${n.due ? ' · for ' + fmtShort(n.due) : ''}`, action: 'View', run: `noticeSheet('${n.id}')` }));
   if(feesOverdue()){
     items.push({ urgent: true, icon: 'wallet', title: `${fmtMoney(balance())} in fees is overdue`, sub: store('wk_reminded', {})[CHILDREN[1].learnerId] ? `Reminder from the office · was due ${fmtShort(FAMILY_ACCOUNT.dueDate)}` : `Was due ${fmtShort(FAMILY_ACCOUNT.dueDate)} · account ${FAMILY_ACCOUNT.number}`, action: 'Pay', run: 'paySheet()' });
   }
@@ -106,7 +114,7 @@ function noticeRow(n){
     <div class="grow">
       <div class="row-title">${esc(n.title)} ${n.live ? '<span class="ribbon">New</span>' : ''}</div>
       <div class="snippet">${esc(n.body)}</div>
-      <div class="meta"><span class="tag" style="--c:${n.priority === 'high' ? 'var(--blazer)' : 'var(--sky)'}">${esc(n.audience)}</span><span class="row-meta">${relAgo(n.date)}</span></div>
+      <div class="meta"><span class="tag" style="--c:${n.priority === 'high' ? 'var(--blazer)' : 'var(--sky)'}">${esc(n.audience)}</span><span class="row-meta">${relAgo(n.date)}</span>${n.attachment ? `<span class="clip-tag">${ICONS.download} Attachment</span>` : ''}${needsAck(n) ? '<span class="pill pill-bad">Please confirm</span>' : ''}</div>
     </div>
   </button>`;
 }
@@ -719,9 +727,9 @@ function arrivedAll(){
 }
 
 /* Toast when the school updates something in another tab or device view */
-let seen = { gate: {}, tuck: {}, merits: [], reminded: false };
+let seen = { gate: {}, tuck: {}, merits: [], reminded: false, cn: [] };
 const familyReminded = () => !!store('wk_reminded', {})[CHILDREN[1].learnerId];
-function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() }, merits: LIVE.merits().map(r => r.id), reminded: familyReminded() }; }
+function snapshotLive(){ seen = { gate: { ...LIVE.gate(SCHOOL_TODAY) }, tuck: { ...LIVE.tuckStatus() }, merits: LIVE.merits().map(r => r.id), reminded: familyReminded(), cn: classNoticesForMe().map(n => n.id) }; }
 function announceLiveChanges(){
   const gate = LIVE.gate(SCHOOL_TODAY), tuck = LIVE.tuckStatus();
   CHILDREN.forEach(c => {
@@ -729,6 +737,7 @@ function announceLiveChanges(){
     if(g && g.status === 'collected' && !seen.gate[c.learnerId]) toast(`${c.first} was collected at ${g.at} by ${g.by}`, 'ok');
   });
   meritBanner();
+  classNoticesForMe().filter(n => !seen.cn.includes(n.id)).forEach(n => pushNote(n.title, `${n.audience}${n.attachment ? ' · attachment' : ''}${n.ack ? ' · please confirm' : ''}`, n.ack ? 'bad' : 'ok', '#/notices'));
   if(familyReminded() && !seen.reminded && balance() > 0) pushNote('Fee reminder from the office', `${fmtMoney(balance())} is overdue on account ${FAMILY_ACCOUNT.number}. Tap to pay.`, 'bad', '#/fees');
   myOrders().forEach(o => {
     if(tuck[o.id] && tuck[o.id] !== seen.tuck[o.id]){
@@ -1112,11 +1121,21 @@ function noticeSheet(id){
   const slipKid = n.action === 'slip' ? CHILDREN.find(c => c.grade === 'Grade 3' && !LIVE.slips()[c.id]) : null;
   openSheet(`<span class="tag" style="--c:${n.priority === 'high' ? 'var(--blazer)' : 'var(--sky)'}">${esc(n.audience)}</span>
     <h2>${esc(n.title)}</h2>
-    <p class="muted" style="margin-bottom:14px">${fmtLong(n.date)} · from the school office</p>
+    <p class="muted" style="margin-bottom:14px">${fmtLong(n.date)} · from ${n.by ? esc(n.by) : 'the school office'}</p>
     <p style="font-size:16px;line-height:1.6">${esc(n.body)}</p>
+    ${n.due ? `<div class="bankbox" style="margin-top:14px"><div><span>For</span><b>${fmtLong(n.due)}</b></div></div>` : ''}
+    ${n.attachment ? `<button class="btn btn-line btn-block" style="margin-top:14px" onclick="downloadNoticeFile('${n.id}')">${ICONS.download} ${esc(n.attachment.name)}</button>` : ''}
+    ${n.classNotice && n.ack ? (LIVE.cnAcks()[n.id] ? `<div class="status-line present" style="margin:14px 0 0">${ICONS.checkCircle} You confirmed you've read this</div>` : `<button class="btn btn-navy btn-block" style="margin-top:12px" onclick="ackNotice('${n.id}')">${ICONS.check} I've read it</button>`) : ''}
     ${slipKid ? `<button class="btn btn-red btn-block" style="margin-top:20px" onclick="slipSheet('${slipKid.id}')">${ICONS.pen} Sign the consent form</button>` : ''}`);
   const row = document.querySelector(`[onclick="noticeSheet('${id}')"] .unread`);
   if(row) row.remove();
+}
+
+function ackNotice(id){
+  const n = allNotices().find(x => x.id === id);
+  LIVE.ackClassNotice(id); markNoticeRead(id);
+  closeSheet(); render();
+  toast(`${n.by} can see you've read it`, 'ok');
 }
 
 function hwSheet(id){

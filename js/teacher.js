@@ -789,6 +789,7 @@ function screenHome(){
           <a class="row" href="#/register"><span class="inbox-ic" style="background:var(--navy-soft);color:var(--navy)">${ICONS.register}</span><div class="grow"><div class="row-title">Register</div><div class="row-sub">${reg ? `Taken ${reg._at ? 'at ' + timeOf(reg._at) : ''}${absent ? ` · ${absent} absent` : ' · everyone present'}` : 'Not taken yet'}</div></div>${reg ? `<span class="pill pill-ok">${ICONS.check} Done</span>` : '<span class="pill pill-warn">To do</span>'}</a>
           <a class="row" href="#/merits"><span class="inbox-ic" style="background:var(--gold-soft);color:#A9760A">${ICONS.trophy}</span><div class="grow"><div class="row-title">Merits</div><div class="row-sub">${meritsToday} given today · Student of the Week ${sotwFor(cls.id) ? 'chosen' : 'not chosen yet'}</div></div><span class="chev">${ICONS.right}</span></a>
         </div></section>
+        <section class="card"><div class="card-head"><h2>Class notices</h2><a class="link" href="#/classnotices">New notice</a></div><div class="rows">${myClassNotices().slice(0, 2).map(cnRow).join('') || '<div class="empty">No class notices yet.</div>'}</div></section>
         ${IS_HOD ? deptCard() : ''}
         <section class="card"><div class="card-head"><h2>My papers</h2><a class="link" href="#/assessments">All</a></div><div class="rows">${myMods().slice(0, 3).map(m => modRow(m, '#/assessment/' + m.id)).join('') || '<div class="empty">No papers sent yet.</div>'}</div></section>
       </div>
@@ -797,13 +798,95 @@ function screenHome(){
 }
 const screenStaffNotices = () => `${head(SCHOOL.name, 'Staff notices')}<section class="card rows">${STAFF_NOTICES.map(staffNoticeRow).join('')}</section>`;
 
+/* ---------------- Class notices (to the parents of my class) ---------------- */
+const CN_TEMPLATES = [
+  { id: 'form', label: 'Bring signed form', title: 'Bring the signed excursion form', body: 'Please sign the excursion form and send it back to school tomorrow. Learners without a signed form can\'t go on the outing.', due: () => schoolDay(1), ack: true },
+  { id: 'test', label: 'Test tomorrow', title: 'Maths exam tomorrow', body: 'We write the Maths exam tomorrow. Please help your child revise tonight and pack a calculator, a ruler and two pens.', due: () => schoolDay(1) },
+  { id: 'exams', label: 'Exams start', title: 'Exams start tomorrow', body: 'Our Term 4 exams start tomorrow. The exam timetable is attached — please check the dates and times.', due: () => schoolDay(1), timetable: true },
+  { id: 'blank', label: 'Blank', title: '', body: '' },
+];
+const myClassNotices = () => allClassNotices().filter(n => n.classId === ME.classId);
+function cnStats(n){
+  const fam = learnersIn(n.classId).length;
+  if(n.seen !== undefined) return { fam, seen: Math.min(fam, n.seen), acked: Math.min(fam, n.acked || 0) };
+  const mins = (Date.now() - Date.parse(n.at)) / 60000;
+  const ours = CHILDREN.some(c => c.classId === n.classId) ? 1 : 0;
+  const josSeen = store('wk_read_notices', []).includes(n.id) ? 1 : 0, josAck = LIVE.cnAcks()[n.id] ? 1 : 0;
+  const seen = Math.min(fam - ours, Math.floor(mins * 0.8)) + josSeen;
+  const acked = Math.min(seen, Math.min(fam - ours, Math.floor(mins * 0.4)) + josAck);
+  return { fam, seen: Math.max(seen, acked), acked };
+}
+function cnStatLine(n){
+  const s = cnStats(n), v = n.ack ? s.acked : s.seen;
+  return `<div class="cn-stat"><div class="progress" style="--c:${n.ack ? 'var(--ok)' : 'var(--sky)'}"><i style="width:${Math.round(v / s.fam * 100)}%"></i></div><span>${n.ack ? 'Confirmed' : 'Seen'} by ${v} of ${s.fam}</span></div>`;
+}
+const cnRow = n => `<button class="row cn-row" onclick="classNoticeSheet('${n.id}')">
+  <div class="grow"><div class="row-title">${esc(n.title)}${n.attachment ? ` <span class="clip">${ICONS.download}</span>` : ''}</div>
+    <div class="row-sub">${relAgo(n.date)}${n.due ? ` · for ${fmtShort(n.due)}` : ''}${n.ack ? ' · confirm needed' : ''}</div>${cnStatLine(n)}</div>
+</button>`;
+
+function screenClassNotices(){
+  const cls = classById(ME.classId), fam = learnersIn(cls.id).length, list = myClassNotices();
+  return `${head(`My class · ${esc(cls.name)}`, 'Class notices', `Goes straight to the parents of ${esc(cls.name)} — ${fam} families.`)}
+    <div class="two-col stack">
+      <section class="card card-pad cn-compose">
+        <div class="eyebrow" style="color:var(--ink-3);margin-bottom:8px">Quick start</div>
+        <div class="filters" style="flex-wrap:wrap;margin-bottom:14px">${CN_TEMPLATES.map(t => `<button class="chip" onclick="useTemplate('${t.id}')">${t.label}</button>`).join('')}</div>
+        <label class="field"><span>Title</span><input id="cn-title" maxlength="80" placeholder="e.g. Maths exam tomorrow"></label>
+        <label class="field"><span>Message</span><textarea id="cn-body" placeholder="What do parents need to know?"></textarea></label>
+        <div class="two-field">
+          <label class="field"><span>For (optional)</span><input id="cn-due" type="date"></label>
+          <label class="field"><span>Attach a file (optional)</span><input id="cn-file" type="file"></label>
+        </div>
+        <label class="check-row"><input type="checkbox" id="cn-tt"> Attach the exam timetable (PDF)</label>
+        <label class="check-row"><input type="checkbox" id="cn-ack"> Ask parents to confirm they've read it</label>
+        <button class="btn btn-navy btn-block" onclick="sendClassNotice()">${ICONS.send} Send to ${fam} families</button>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Sent</h2><span class="row-meta">${list.length}</span></div>
+        <div class="rows">${list.map(cnRow).join('') || `<div class="empty">${ICONS.megaphone}<p>No class notices yet.</p></div>`}</div>
+      </section>
+    </div>`;
+}
+function useTemplate(id){
+  const t = CN_TEMPLATES.find(x => x.id === id);
+  $('#cn-title').value = t.title; $('#cn-body').value = t.body;
+  $('#cn-due').value = t.due ? t.due() : '';
+  $('#cn-ack').checked = !!t.ack; $('#cn-tt').checked = !!t.timetable;
+  (t.title ? $('#cn-body') : $('#cn-title')).focus();
+}
+async function sendClassNotice(){
+  const title = $('#cn-title').value.trim(), body = $('#cn-body').value.trim();
+  if(!title || !body){ toast('Add a title and a message', 'bad'); return; }
+  const cls = classById(ME.classId), due = $('#cn-due').value || null;
+  let attachment = null;
+  if($('#cn-tt').checked) attachment = { kind: 'timetable', className: cls.name, start: due || EXAMS_START, name: `${cls.name.replace(/\s+/g, '_')}_exam_timetable.pdf` };
+  else if($('#cn-file').files[0]){ const f = await readFile($('#cn-file').files[0]); attachment = { kind: 'file', ...f }; }
+  LIVE.addClassNotice({ id: 'cn-' + Date.now(), classId: cls.id, by: ME.short, title, body, date: TODAY_ISO, at: new Date().toISOString(), due, ack: $('#cn-ack').checked, attachment });
+  render();
+  toast(`Sent to ${learnersIn(cls.id).length} families in ${cls.name}`, 'ok');
+}
+function classNoticeSheet(id){
+  const n = allClassNotices().find(x => x.id === id), s = cnStats(n);
+  openSheet(`<div class="eyebrow">${esc(classById(n.classId).name)} · ${fmtLong(n.date)}</div>
+    <h2>${esc(n.title)}</h2>
+    <p style="font-size:16px;line-height:1.6;margin-bottom:14px">${esc(n.body)}</p>
+    <div class="bankbox">
+      ${n.due ? `<div><span>For</span><b>${fmtLong(n.due)}</b></div>` : ''}
+      <div><span>Seen by</span><b>${s.seen} of ${s.fam} families</b></div>
+      ${n.ack ? `<div><span>Confirmed by</span><b>${s.acked} of ${s.fam} families</b></div>` : ''}
+    </div>
+    ${n.attachment ? `<button class="btn btn-line btn-block" onclick="downloadNoticeFile('${n.id}')">${ICONS.download} ${esc(n.attachment.name)}</button>` : ''}`);
+}
+setInterval(() => { if(parseRoute().name === 'classnotices' && !document.querySelector('.cn-compose :focus') && !document.querySelector('#sheet.open')) renderView(); }, 20000);
+
 /* ---------------- Routes & chrome ---------------- */
 const ROUTES = {
   home: screenHome, register: screenRegister, merits: screenMerits, assessments: screenAssessments, assessment: screenAssessment,
-  observations: screenObservations, staffnotices: screenStaffNotices,
+  observations: screenObservations, staffnotices: screenStaffNotices, classnotices: screenClassNotices,
   ...(IS_HOD ? { moderation: screenModeration, review: screenReview, deptcal: screenDeptCalendar } : {}),
 };
-const TITLES = { register: 'Register', merits: 'Merits', assessments: 'My papers', assessment: 'Paper', observations: 'Observations', staffnotices: 'Staff notices', moderation: 'Moderation', review: 'Check paper', deptcal: 'Calendar' };
+const TITLES = { classnotices: 'Class notices', register: 'Register', merits: 'Merits', assessments: 'My papers', assessment: 'Paper', observations: 'Observations', staffnotices: 'Staff notices', moderation: 'Moderation', review: 'Check paper', deptcal: 'Calendar' };
 const TOP_LEVEL = ['home', 'register', 'merits', IS_HOD ? 'moderation' : 'assessments'];
 const PARENT_ROUTE = { assessment: 'assessments', review: 'moderation' };
 
@@ -827,7 +910,7 @@ function renderSide(r){
   const active = PARENT_ROUTE[r.name] || r.name;
   const link = ([id, label, icon, count]) => `<a class="side-link ${active === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}${label}${count ? `<span class="count">${count}</span>` : ''}</a>`;
   const groups = [
-    ['My class', [['home', 'Home', 'home'], ['register', 'Register', 'register'], ['merits', 'Merits', 'trophy']]],
+    ['My class', [['home', 'Home', 'home'], ['register', 'Register', 'register'], ['merits', 'Merits', 'trophy'], ['classnotices', 'Class notices', 'megaphone']]],
     ['Papers', [['assessments', 'My papers', 'book', needsFix().length], ...(IS_HOD ? [['moderation', 'Moderation', 'shield', toReview().length]] : [])]],
     [IS_HOD ? 'Department' : 'Growing', [['observations', 'Observations', 'calendar', obsCount()], ...(IS_HOD ? [['deptcal', 'Calendar', 'grid']] : [])]],
     ['School', [['staffnotices', 'Staff notices', 'megaphone']]],
@@ -847,12 +930,13 @@ function renderTabs(r){
   const counts = { moderation: toReview().length, assessments: needsFix().length };
   const more = obsCount() + (IS_HOD ? needsFix().length : 0);
   return tabs.map(([id, label, icon]) => `<a class="tab ${active === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}<span>${label}</span>${counts[id] ? `<span class="count">${counts[id]}</span>` : ''}</a>`).join('')
-    + `<button class="tab ${['observations', 'staffnotices', 'deptcal', ...(IS_HOD ? ['assessments'] : [])].includes(active) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span>${more ? `<span class="count">${more}</span>` : ''}</button>`;
+    + `<button class="tab ${['observations', 'staffnotices', 'deptcal', 'classnotices', ...(IS_HOD ? ['assessments'] : [])].includes(active) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span>${more ? `<span class="count">${more}</span>` : ''}</button>`;
 }
 function moreSheet(){
   const item = (href, label, icon, count) => `<a class="row" href="${href}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div>${count ? `<span class="count">${count}</span>` : ''}<span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>${esc(ME.title)} ${esc(ME.name)}</h2><p class="lede">${esc(myRoleLine())} · ${SCHOOL.name}</p>
     <div class="card rows menu-list">
+      ${item('#/classnotices', 'Class notices', 'megaphone')}
       ${item('#/observations', 'Observations', 'calendar', obsCount())}
       ${IS_HOD ? item('#/deptcal', 'Department calendar', 'grid') : ''}
       ${IS_HOD ? item('#/assessments', 'My papers', 'book', needsFix().length) : ''}
