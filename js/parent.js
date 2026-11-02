@@ -174,6 +174,7 @@ function screenHome(){
 
     <div class="home-grid">
       <div class="stack">
+        ${newMeritsCard()}
         ${attn.length ? `<section class="card">
           <div class="card-head"><h2>Needs your attention</h2></div>
           <div class="rows">${attn.map(a => `
@@ -725,10 +726,7 @@ function announceLiveChanges(){
     const g = gate[c.learnerId];
     if(g && g.status === 'collected' && !seen.gate[c.learnerId]) toast(`${c.first} was collected at ${g.at} by ${g.by}`, 'ok');
   });
-  LIVE.merits().filter(r => !seen.merits.includes(r.id)).forEach(r => {
-    const kid = CHILDREN.find(k => k.learnerId === r.learnerId);
-    if(kid) toast(r.type === 'merit' ? `+${r.points} ${catOf('merit', r.cat).label} for ${kid.first} — ${r.by}` : `${kid.first} received a demerit — ${r.by}`, r.type === 'merit' ? 'ok' : 'bad');
-  });
+  meritBanner();
   myOrders().forEach(o => {
     if(tuck[o.id] && tuck[o.id] !== seen.tuck[o.id]){
       toast(tuck[o.id] === 'ready' ? `${childById(o.childId).first}'s tuck shop order is ready` : `${childById(o.childId).first} has collected their tuck shop order`, 'ok');
@@ -791,6 +789,8 @@ function meritRow(r, withAck = true){
 
 function screenAchievements(){
   const c = child();
+  const unseenHere = newMerits().filter(r => r.learnerId === c.learnerId).map(r => r.id);
+  if(unseenHere.length) setTimeout(() => { markMeritsSeen(unseenHere); renderChrome(); }, 1200);
   const t = meritTotals(c.learnerId);
   const badges = childBadges(c);
   const earned = badges.filter(b => b.earned).length;
@@ -841,6 +841,7 @@ function screenAchievements(){
 
 function meritSheet(id){
   const r = allMerits().find(x => x.id === id), c = catOf(r.type, r.cat), merit = r.type === 'merit';
+  if(merit && newMerits().some(x => x.id === id)){ markMeritsSeen([id]); setTimeout(() => render(), 0); }
   const kid = CHILDREN.find(k => k.learnerId === r.learnerId);
   openSheet(`<div class="eyebrow">${merit ? 'Merit' : 'Demerit'} · ${esc(kid.first)}</div>
     <h2>${esc(c.label)}</h2>
@@ -890,6 +891,79 @@ function printCertificate(){
   document.body.classList.add('print-cert');
   window.print();
   setTimeout(() => document.body.classList.remove('print-cert'), 500);
+}
+
+/* New merits: a quiet push-style banner, a Home card until seen, and a count on Achievements */
+const myKidOf = r => CHILDREN.find(k => k.learnerId === r.learnerId);
+function initMeritNotices(){
+  if(store('wk_seen_merits', null) !== null) return;
+  const recent = schoolDay(-1);
+  const seenIds = allMerits().filter(r => myKidOf(r) && !(r.type === 'merit' && r.date >= recent)).map(r => r.id);
+  save('wk_seen_merits', seenIds);
+  save('wk_bannered', seenIds);
+}
+const newMerits = () => {
+  const seenIds = store('wk_seen_merits', []);
+  return allMerits().filter(r => r.type === 'merit' && myKidOf(r) && !seenIds.includes(r.id)).sort((a, b) => recKey(b).localeCompare(recKey(a)));
+};
+function markMeritsSeen(ids){
+  const seenIds = store('wk_seen_merits', []);
+  save('wk_seen_merits', [...new Set([...seenIds, ...ids])]);
+}
+function newMeritsCard(){
+  const list = newMerits();
+  if(!list.length) return '';
+  return `<section class="card new-merits">
+    <div class="card-head"><h2>New merits</h2><button class="btn btn-sm btn-line" onclick="gotNewMerits()">${ICONS.check} Got it</button></div>
+    <div class="rows">${list.slice(0, 4).map(r => {
+      const c = catOf('merit', r.cat), kid = myKidOf(r);
+      return `<button class="row merit-row" onclick="meritSheet('${r.id}')">
+        <span class="food" style="--c:${c.tone}">${ICONS[c.icon]}</span>
+        <div class="grow"><div class="row-title">${esc(kid.first)} · ${esc(c.label)}</div><div class="row-sub">${r.note ? esc(r.note) + ' · ' : ''}${esc(r.by)} · ${r.at ? 'Just now' : relAgo(r.date)}</div></div>
+        <span class="pts plus">+${r.points}</span>
+      </button>`;
+    }).join('')}${list.length > 4 ? `<a class="row" href="#/achievements"><div class="grow row-sub">and ${list.length - 4} more</div><span class="chev">${ICONS.right}</span></a>` : ''}</div>
+  </section>`;
+}
+function gotNewMerits(){ markMeritsSeen(newMerits().map(r => r.id)); render(); }
+
+let pushTimer = null;
+function meritBanner(){
+  const bannered = store('wk_bannered', []);
+  const fresh = allMerits().filter(r => myKidOf(r) && !bannered.includes(r.id)).sort((a, b) => recKey(b).localeCompare(recKey(a)));
+  if(!fresh.length) return;
+  save('wk_bannered', [...bannered, ...fresh.map(r => r.id)]);
+  const one = fresh.length === 1 ? fresh[0] : null;
+  const kids = [...new Set(fresh.map(r => myKidOf(r).first))].join(' & ');
+  const merits = fresh.filter(r => r.type === 'merit').length;
+  let title, body;
+  if(one){
+    const c = catOf(one.type, one.cat), kid = myKidOf(one);
+    title = one.type === 'merit' ? `+${one.points} ${c.label} for ${kid.first}` : `${kid.first} received a demerit`;
+    body = `${one.note ? '“' + one.note + '” — ' : ''}${one.type === 'merit' ? one.by : c.label + ' · ' + one.by}`;
+  } else {
+    title = merits === fresh.length ? `${merits} new merits for ${kids}` : `${fresh.length} updates for ${kids}`;
+    body = 'From the classroom — tap to see them';
+  }
+  document.querySelector('.push')?.remove();
+  const el = document.createElement('button');
+  el.className = `push ${one && one.type === 'demerit' ? 'demerit' : ''}`;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<img src="../assets/brand/emblem.png" alt=""><span class="grow"><span class="push-top"><b>Whizzkidz</b><span>now</span></span><span class="push-title">${esc(title)}</span><span class="push-body">${esc(body)}</span></span>`;
+  el.onclick = () => { hidePush(); if(one) meritSheet(one.id); else location.hash = '#/achievements'; };
+  let y0 = null;
+  el.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchmove', e => { if(y0 !== null && e.touches[0].clientY - y0 < -24){ y0 = null; hidePush(); } }, { passive: true });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(hidePush, 6500);
+}
+function hidePush(){
+  const el = document.querySelector('.push');
+  if(!el) return;
+  el.classList.remove('in'); el.classList.add('out');
+  setTimeout(() => el.remove(), 400);
 }
 
 /* Celebrate new badges and Student of the Week the moment the school awards them */
@@ -963,7 +1037,7 @@ function renderBar(r){
 
 function renderSide(r){
   const active = PARENT_ROUTE[r.name] || r.name;
-  const counts = { notices: unreadNotices(), messages: unreadThreads(), fees: feesOverdue() ? '!' : 0 };
+  const counts = { notices: unreadNotices(), messages: unreadThreads(), fees: feesOverdue() ? '!' : 0, achievements: newMerits().length };
   const link = ([id, label, icon]) => `<a class="side-link ${active === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}${label}${counts[id] ? `<span class="count">${counts[id]}</span>` : ''}</a>`;
   const groups = [
     ['Your children', [['home', 'Home', 'home'], ['timetable', 'Timetable', 'clock'], ['diary', 'Homework diary', 'book'], ['attendance', 'Attendance', 'register'], ['achievements', 'Achievements', 'trophy'], ['collection', 'Collection', 'car'], ['tuckshop', 'Tuck shop', 'pizza']]],
@@ -981,7 +1055,7 @@ function renderSide(r){
 }
 
 function renderTabs(r){
-  const more = unreadNotices() + unreadThreads();
+  const more = unreadNotices() + unreadThreads() + newMerits().length;
   const tabs = [['home', 'Home', 'home'], ['diary', 'Diary', 'book'], ['timetable', 'Timetable', 'clock'], ['fees', 'Fees', 'wallet']];
   return tabs.map(([id, label, icon]) => `<a class="tab ${r.name === id ? 'on' : ''}" href="#/${id}">${ICONS[icon]}<span>${label}</span>${id === 'fees' && feesOverdue() ? '<span class="count">!</span>' : ''}</a>`).join('')
     + `<button class="tab ${MORE_ROUTES.includes(r.name) ? 'on' : ''}" onclick="moreSheet()">${ICONS.more}<span>More</span>${more ? `<span class="count">${more}</span>` : ''}</button>`;
@@ -1017,7 +1091,7 @@ function moreSheet(){
   const item = (id, label, icon, count) => `<a class="row" href="#/${id}" onclick="closeSheet()"><span class="ic">${ICONS[icon]}</span><div class="grow"><div class="row-title">${label}</div></div>${count ? `<span class="count">${count}</span>` : ''}<span class="chev">${ICONS.right}</span></a>`;
   openSheet(`<h2>More</h2>
     <div class="card rows menu-list">
-      ${item('achievements', 'Achievements', 'trophy')}
+      ${item('achievements', 'Achievements', 'trophy', newMerits().length)}
       ${item('collection', 'Collection', 'car')}
       ${item('tuckshop', 'Tuck shop', 'pizza')}
       ${item('attendance', 'Attendance', 'register')}
@@ -1217,5 +1291,7 @@ window.addEventListener('storage', () => { announceLiveChanges(); render(); cele
 DESKTOP.addEventListener('change', () => render());
 hydrateIcons();
 initCelebrations();
+initMeritNotices();
 render({ animate: true });
 celebrate();
+setTimeout(meritBanner, 900);
