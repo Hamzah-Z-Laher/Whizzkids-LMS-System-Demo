@@ -468,6 +468,7 @@ function screenProfile(){
         <section class="card"><div class="card-head"><h2>This app</h2></div><div class="rows">${installRow()}</div></section>
         <button class="btn btn-line btn-block" onclick="resetDemoSheet()">${ICONS.refresh} Reset demo data</button>
         <button class="btn btn-line btn-block" onclick="signOut()" style="color:var(--blazer)">${ICONS.logout} Sign out</button>
+        ${switchViewHTML('parent')}
       </div>
     </div>
   </div>`;

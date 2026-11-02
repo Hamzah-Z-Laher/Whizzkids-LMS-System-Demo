@@ -2,7 +2,7 @@
    All dates are relative to the day the demo is opened so it never looks stale. */
 
 /* Bump when sample data changes so stale demo state from an older version is cleared once. */
-const DATA_VERSION = '3-f1';
+const DATA_VERSION = '4-roles';
 try{
   if(localStorage.getItem('wk_version') !== DATA_VERSION){
     Object.keys(localStorage).filter(k => k.startsWith('wk_') && k !== 'wk_session').forEach(k => localStorage.removeItem(k));
@@ -199,6 +199,7 @@ const CLASSES = [
   { id: 'c2', name: 'Grade 1A', phase: 'primary', teacher: 'Mr Webber' },
   { id: 'c3', name: 'Grade 3B', phase: 'primary', teacher: 'Mr Coulthard' },
   { id: 'c4', name: 'Grade 6A', phase: 'primary', teacher: 'Mr Rosberg' },
+  { id: 'c6', name: 'Grade 5A', phase: 'primary', teacher: 'Mr Häkkinen' },
   { id: 'c5', name: 'Grade 8', phase: 'high', teacher: 'Mr Massa' },
 ];
 
@@ -233,6 +234,11 @@ const LEARNERS = [
   ['l28','Sebastian Vettel','c5','Maurizio Arrivabene',95,'paid',0],
   ['l29','Jenson Button','c5','Martin Whitmarsh',88,'overdue',2400],
   ['l30','Kimi Raikkonen','c5','Ron Dennis',93,'paid',0],
+  ['l31','Nyck de Vries','c6','Franz Tost',94,'paid',0],
+  ['l32','Stoffel Vandoorne','c6','Eric Boullier',91,'paid',0],
+  ['l33','Antonio Giovinazzi','c6','Frederic Vasseur',96,'partial',450],
+  ['l34','Robert Kubica','c6','Guenther Steiner',89,'paid',0],
+  ['l35','Romain Grosjean','c6','Cyril Abiteboul',92,'paid',0],
 ].map(([id, name, classId, parent, attendance, feeStatus, balance]) => ({ id, name, classId, parent, attendance, feeStatus, balance }));
 
 const GRADE3_CLASS_SIZE = 26;
@@ -283,7 +289,7 @@ const PICKUP_SLOTS = [
   { id: 'aftercare', label: 'Aftercare · 17:00' },
 ];
 
-const CLASS_END = { c1: '12:00', c2: '12:30', c3: '12:20', c4: '12:50', c5: '13:30' };
+const CLASS_END = { c1: '12:00', c2: '12:30', c3: '12:20', c4: '12:50', c5: '13:30', c6: '12:50' };
 const CARS = ['White Toyota Corolla', 'Red Suzuki Swift', 'Black Ford Ranger', 'Silver VW Polo', 'Grey Honda Jazz', 'White Hyundai Tucson', 'Blue Renault Kwid'];
 
 /* ---------------- Merits, demerits & Student of the Week ---------------- */
@@ -369,3 +375,87 @@ const SOTW_SEED = [
   sotw(weeksAgo(3), 'c3', 'l7', 'Always encouraging his classmates'),
 ];
 const SOTW_REASONS = ['Kindness to others', 'Outstanding effort', 'Leadership in class', 'Academic excellence', 'Always helpful', 'Big improvement'];
+
+/* ---------------- Staff accounts, department, moderation & observations ---------------- */
+
+const STAFF_ACCOUNTS = {
+  teacher: { id: 't-rosberg', title: 'Mr', name: 'Nico Rosberg', short: 'Mr Rosberg', role: 'Class teacher · Grade 6A', classId: 'c4', subjects: ['Mathematics', 'English', 'Natural Sciences'], grade: 'Grade 6' },
+  hod: { id: 't-hakkinen', title: 'Mr', name: 'Mika Häkkinen', short: 'Mr Häkkinen', role: 'HOD Intermediate Phase · Grade 5A', classId: 'c6', subjects: ['Mathematics', 'Technology'], grade: 'Grade 5', hod: true },
+};
+const DEPARTMENT = {
+  name: 'Intermediate Phase', grades: 'Grades 4–6',
+  teachers: [
+    { id: 't-chadwick', name: 'Ms Chadwick', full: 'Jamie Chadwick', cls: 'Grade 4A' },
+    { id: 't-hakkinen', name: 'Mr Häkkinen', full: 'Mika Häkkinen', cls: 'Grade 5A', hod: true },
+    { id: 't-rosberg', name: 'Mr Rosberg', full: 'Nico Rosberg', cls: 'Grade 6A' },
+  ],
+};
+const deptTeacher = id => DEPARTMENT.teachers.find(t => t.id === id);
+
+const STAFF_NOTICES = [
+  { id: 'sn1', title: 'Term 4 papers due for moderation', body: `All Intermediate Phase exam papers and memos must be submitted for moderation by ${fmtLong(schoolDay(4))}.`, from: 'Mr Häkkinen · HOD', date: dayOffset(-2) },
+  { id: 'sn2', title: 'Exam timetable published', body: 'The Term 4 exam timetable is in the staff room and on the calendar. Invigilation duties follow on Monday.', from: 'Office', date: dayOffset(-4) },
+  { id: 'sn3', title: 'Staff meeting Wednesday 14:00', body: 'Agenda: year-end reports, prize-giving and the Grade 7 farewell.', from: 'Principal', date: dayOffset(-6) },
+];
+
+const MOD_CHECKLIST = [
+  { id: 'caps', label: 'Aligned to CAPS content for the term' },
+  { id: 'cog', label: 'Cognitive levels are balanced' },
+  { id: 'marks', label: 'Mark allocation is correct and totals add up' },
+  { id: 'memo', label: 'Memorandum is complete and accurate' },
+  { id: 'lang', label: 'Instructions and language are clear' },
+  { id: 'layout', label: 'Layout, numbering and diagrams are correct' },
+  { id: 'time', label: 'Time allocation is appropriate' },
+];
+const COG_LEVELS = [
+  { id: 'k', label: 'Knowledge', target: 25 },
+  { id: 'r', label: 'Routine procedures', target: 45 },
+  { id: 'c', label: 'Complex procedures', target: 20 },
+  { id: 'p', label: 'Problem solving', target: 10 },
+];
+
+const SAMPLE_PAPERS = {
+  'Mathematics': [
+    ['Whole numbers: place value, rounding and ordering', 12], ['Common fractions and decimals', 15], ['Calculations with all four operations', 14],
+    ['Geometric patterns and number sentences', 10], ['2D shapes, symmetry and transformations', 12], ['Measurement: length, mass and capacity', 12], ['Data handling: bar graph interpretation', 10], ['Word problems', 15],
+  ],
+  'English': [['Comprehension: unseen text', 20], ['Visual literacy: advertisement', 10], ['Summary writing', 10], ['Language structures and conventions', 20]],
+  'Natural Sciences': [['Solids, liquids and gases', 12], ['Mixtures and solutions', 12], ['Electric circuits', 14], ['Energy transfer', 12]],
+  'Technology': [['Structures and forces', 15], ['Systems and control', 15], ['Design process', 20]],
+};
+
+const mods = (id, teacherId, title, subject, grade, type, marks, minutes, status, versions, reviews, daysAgo) =>
+  ({ id, teacherId, title, subject, grade, type, marks, minutes, status, versions, reviews, at: dayOffset(-daysAgo) });
+const sampleFiles = () => [{ kind: 'paper', name: 'Question paper', sample: true }, { kind: 'memo', name: 'Memorandum', sample: true }];
+const fullCheck = ok => Object.fromEntries(MOD_CHECKLIST.map(c => [c.id, { ok, comment: '' }]));
+
+const MOD_SEED = [
+  mods('mod-1', 't-rosberg', 'Natural Sciences · Term 4 Test', 'Natural Sciences', 'Grade 6', 'Test', 50, 60, 'approved',
+    [{ v: 1, files: sampleFiles(), note: '', at: dayOffset(-12) }],
+    [{ v: 1, by: 'Mr Häkkinen', at: dayOffset(-10), decision: 'approved', checklist: fullCheck(true), cog: { k: 24, r: 46, c: 20, p: 10 }, comments: 'Well balanced paper and a clear memo. Approved.' }], 12),
+  mods('mod-2', 't-rosberg', 'English HL · Comprehension Test', 'English', 'Grade 6', 'Test', 40, 45, 'changes',
+    [{ v: 1, files: sampleFiles(), note: 'Based on the Term 4 reading text.', at: dayOffset(-5) }],
+    [{ v: 1, by: 'Mr Häkkinen', at: dayOffset(-3), decision: 'changes',
+       checklist: { ...fullCheck(true), cog: { ok: false, comment: 'Too many knowledge questions — add two higher-order questions in section A.' }, marks: { ok: false, comment: 'Question 4 is out of 6 but the memo allocates 8.' } },
+       cog: { k: 40, r: 40, c: 15, p: 5 }, comments: 'Good text choice. Please rebalance the cognitive levels and fix the mark allocation in question 4, then resubmit.' }], 5),
+  mods('mod-3', 't-chadwick', 'English HL · Term 4 Exam Paper 1', 'English', 'Grade 4', 'Exam', 60, 90, 'submitted',
+    [{ v: 1, files: sampleFiles(), note: 'Paper 1 covers comprehension and language.', at: dayOffset(-1) }], [], 1),
+  mods('mod-4', 't-chadwick', 'Mathematics · Term 4 Test', 'Mathematics', 'Grade 4', 'Test', 40, 60, 'approved',
+    [{ v: 1, files: sampleFiles(), note: '', at: dayOffset(-15) }],
+    [{ v: 1, by: 'Mr Häkkinen', at: dayOffset(-13), decision: 'approved', checklist: fullCheck(true), cog: { k: 25, r: 45, c: 20, p: 10 }, comments: 'Approved — great use of diagrams.' }], 15),
+];
+
+const OBS_CRITERIA = [
+  { id: 'plan', label: 'Lesson planning and preparation' },
+  { id: 'engage', label: 'Learner engagement and questioning' },
+  { id: 'assess', label: 'Assessment for learning' },
+  { id: 'manage', label: 'Classroom management' },
+];
+const OBS_FOCUS = ['Learner engagement and questioning', 'Assessment for learning', 'Differentiation', 'Classroom management', 'Use of resources'];
+const OBS_SEED = [
+  { id: 'obs-1', teacherId: 't-rosberg', by: 'Mr Häkkinen', date: schoolDay(3), time: '09:10', cls: 'Grade 6A', subject: 'Mathematics', focus: 'Learner engagement and questioning', type: 'QMS lesson observation', status: 'requested', at: dayOffset(-1) },
+  { id: 'obs-2', teacherId: 't-chadwick', by: 'Mr Häkkinen', date: schoolDay(5), time: '10:20', cls: 'Grade 4A', subject: 'English', focus: 'Differentiation', type: 'QMS lesson observation', status: 'accepted', at: dayOffset(-4) },
+  { id: 'obs-3', teacherId: 't-rosberg', by: 'Mr Häkkinen', date: schoolDay(-30), time: '08:20', cls: 'Grade 6A', subject: 'Natural Sciences', focus: 'Assessment for learning', type: 'QMS lesson observation', status: 'acknowledged', at: dayOffset(-46),
+    feedback: { ratings: { plan: 4, engage: 3, assess: 4, manage: 4 }, strengths: 'Clear objectives and excellent use of practical demonstrations.', growth: 'Give learners more wait time before taking answers.', at: dayOffset(-40) },
+    reflection: 'I will use think-pair-share to build in more wait time.' },
+];

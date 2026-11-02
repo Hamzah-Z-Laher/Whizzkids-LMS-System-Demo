@@ -275,6 +275,38 @@ function placeTabGlow(bar){
   lastTabPos = to;
 }
 
+/* ---------------- Push-style notification (portals) ---------------- */
+let pushNoteTimer = null;
+function pushNote(title, body, tone = 'ok', href = null){
+  document.querySelector('.push')?.remove();
+  const el = document.createElement('button');
+  el.className = `push ${tone === 'bad' ? 'demerit' : ''}`;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<img src="../assets/brand/emblem.png" alt=""><span class="grow"><span class="push-top"><b>Whizzkidz</b><span>now</span></span><span class="push-title">${esc(title)}</span><span class="push-body">${esc(body)}</span></span>`;
+  const hide = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 400); };
+  el.onclick = () => { hide(); if(href) location.hash = href; };
+  let y0 = null;
+  el.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchmove', e => { if(y0 !== null && e.touches[0].clientY - y0 < -24){ y0 = null; hide(); } }, { passive: true });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  clearTimeout(pushNoteTimer);
+  pushNoteTimer = setTimeout(hide, 7000);
+}
+
+/* ---------------- Demo role switcher ---------------- */
+const DEMO_ROLES = [
+  { id: 'parent', label: 'Parent', who: 'Jos Verstappen · Max & Kimi', path: 'parent/index.html', icon: 'users' },
+  { id: 'office', label: 'Office', who: 'Claire Williams · Administrator', path: 'office/index.html', icon: 'wallet' },
+  { id: 'teacher', label: 'Teacher', who: 'Mr Rosberg · Grade 6A', path: 'teacher/index.html', icon: 'book' },
+  { id: 'hod', label: 'HOD', who: 'Mr Häkkinen · Intermediate Phase', path: 'hod/index.html', icon: 'shield' },
+];
+function switchRole(id, base = '../'){ setSignedIn(id, true); location.href = base + DEMO_ROLES.find(r => r.id === id).path; }
+function switchViewHTML(current){
+  return `<div class="eyebrow section-label">Switch view · demo</div>
+    <div class="card rows menu-list">${DEMO_ROLES.filter(r => r.id !== current).map(r => `<button class="row" onclick="switchRole('${r.id}')"><span class="ic">${ICONS[r.icon]}</span><div class="grow"><div class="row-title">${r.label}</div><div class="row-sub">${esc(r.who)}</div></div><span class="chev">${ICONS.right}</span></button>`).join('')}</div>`;
+}
+
 /* ---------------- Demo reset ---------------- */
 function resetDemoSheet(){
   openSheet(`<div class="eyebrow">Demo</div>
